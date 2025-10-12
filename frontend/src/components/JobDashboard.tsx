@@ -41,7 +41,11 @@ interface Filters {
   sortBy: string;
 }
 
-export const JobDashboard = () => {
+interface JobDashboardProps {
+  showHeader?: boolean;
+}
+
+export const JobDashboard = ({ showHeader = true }: JobDashboardProps) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,17 +213,19 @@ export const JobDashboard = () => {
   };
 
   return (
-    <section className="py-20 relative" id="jobs">
+    <section className={showHeader ? "py-20 relative" : "relative"} id={showHeader ? "jobs" : undefined}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-12 fade-in">
-          <h2 className="text-4xl font-bold mb-4">
-            Discover <span className="text-gradient">Opportunities</span>
-          </h2>
-          <p className="text-muted-foreground text-lg">
-            Find the perfect project and start earning in SOL
-          </p>
-        </div>
+        {showHeader && (
+          <div className="mb-12 fade-in">
+            <h2 className="text-4xl font-bold mb-4">
+              Discover <span className="text-gradient">Opportunities</span>
+            </h2>
+            <p className="text-muted-foreground text-lg">
+              Find the perfect project and start earning in SOL
+            </p>
+          </div>
+        )}
 
         {/* Search and Filters */}
         <div className="mb-8 fade-in">

@@ -58,26 +58,24 @@ export const ApplicationModal = ({
                 .map((url) => url.trim())
                 .filter((url) => url.length > 0);
 
-            // Insert application
-            const { error } = await supabase.from("applications").insert({
-                job_id: jobId,
-                freelancer_id: user.id,
-                cover_letter: coverLetter || null,
-                estimated_completion_days: estimatedDays,
-                portfolio_urls: urls.length > 0 ? urls : null,
-                status: "pending",
+            // Submit application using new API client
+            const { data, error } = await supabase.applications.create({
+                jobId,
+                coverLetter: coverLetter || null,
+                estimatedCompletionDays: estimatedDays,
+                portfolioUrls: urls.length > 0 ? urls : null,
             });
 
-            if (error) throw error;
+            if (error) throw new Error(error);
 
             toast.success("Application submitted successfully!");
             onSuccess();
         } catch (error: any) {
             console.error("Error submitting application:", error);
-            if (error.code === "23505") {
+            if (error.includes("Already applied")) {
                 toast.error("You have already applied to this job");
             } else {
-                toast.error(error.message || "Failed to submit application");
+                toast.error(error || "Failed to submit application");
             }
         } finally {
             setIsSubmitting(false);

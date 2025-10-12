@@ -85,65 +85,15 @@ export default function JobApplicants() {
         try {
             setLoading(true);
 
-            // Fetch job details
-            const { data: jobData, error: jobError } = await supabase
-                .from("jobs")
-                .select("*")
-                .eq("id", id)
-                .eq("recruiter_id", user.id)
-                .single();
+            // Fetch job applications (includes job verification and all related data)
+            const { data, error } = await supabase.jobs.getApplicants(id);
 
-            if (jobError) throw jobError;
-            setJob(jobData);
+            if (error) throw new Error(error);
 
-            // Fetch applications with freelancer info
-            const { data: applicationsData, error: applicationsError } = await supabase
-                .from("applications")
-                .select(`
-          id,
-          freelancer_id,
-          cover_letter,
-          estimated_completion_days,
-          portfolio_urls,
-          status,
-          created_at
-        `)
-                .eq("job_id", id)
-                .order("created_at", { ascending: false });
-
-            if (applicationsError) throw applicationsError;
-
-            // Fetch freelancer profiles and trust points for each application
-            const enrichedApplications = await Promise.all(
-                (applicationsData || []).map(async (app) => {
-                    const [{ data: profile }, { data: trustData }] = await Promise.all([
-                        supabase
-                            .from("profiles")
-                            .select("full_name, avatar_url, bio, skills, hourly_rate")
-                            .eq("id", app.freelancer_id)
-                            .single(),
-                        supabase
-                            .from("trust_points")
-                            .select("total_points, completed_projects, tier, average_rating")
-                            .eq("user_id", app.freelancer_id)
-                            .single(),
-                    ]);
-
-                    return {
-                        ...app,
-                        freelancer: profile || {
-                            full_name: "Unknown",
-                            avatar_url: null,
-                            bio: null,
-                            skills: null,
-                            hourly_rate: null,
-                        },
-                        trust_points: trustData,
-                    };
-                })
-            );
-
-            setApplications(enrichedApplications);
+            if (data) {
+                setJob(data.job);
+                setApplications(data.applications || []);
+            }
         } catch (error: any) {
             console.error("Error fetching applications:", error);
             toast.error("Failed to load applications");
@@ -162,30 +112,22 @@ export default function JobApplicants() {
 
         try {
             // Update job status
-            await supabase
-                .from("jobs")
-                .update({
-                    status: "in_progress",
-                    selected_freelancer_id: selectedApplication.freelancer_id,
-                })
-                .eq("id", id);
+            await supabase.jobs.update(id!, {
+                status: "in_progress",
+                selectedFreelancerId: selectedApplication.freelancer_id,
+            });
 
             // Update application status to selected
-            await supabase
-                .from("applications")
-                .update({ status: "selected" })
-                .eq("id", selectedApplication.id);
+            await supabase.applications.updateStatus(selectedApplication.id, "selected");
 
             // Reject other applications
             const otherApplicationIds = applications
                 .filter((app) => app.id !== selectedApplication.id)
                 .map((app) => app.id);
 
-            if (otherApplicationIds.length > 0) {
-                await supabase
-                    .from("applications")
-                    .update({ status: "rejected" })
-                    .in("id", otherApplicationIds);
+            // Update each other application to rejected status
+            for (const appId of otherApplicationIds) {
+                await supabase.applications.updateStatus(appId, "rejected");
             }
 
             toast.success("Freelancer selected successfully!");
@@ -199,10 +141,7 @@ export default function JobApplicants() {
 
     const handleShortlist = async (applicationId: string) => {
         try {
-            await supabase
-                .from("applications")
-                .update({ status: "shortlisted" })
-                .eq("id", applicationId);
+            await supabase.applications.updateStatus(applicationId, "shortlisted");
 
             toast.success("Applicant shortlisted");
             fetchApplications();
@@ -214,10 +153,7 @@ export default function JobApplicants() {
 
     const handleReject = async (applicationId: string) => {
         try {
-            await supabase
-                .from("applications")
-                .update({ status: "rejected" })
-                .eq("id", applicationId);
+            await supabase.applications.updateStatus(applicationId, "rejected");
 
             toast.success("Applicant rejected");
             setShowRejectDialog(false);
@@ -579,6 +515,7 @@ export default function JobApplicants() {
                     jobId={job.id}
                     jobTitle={job.title}
                     freelancerName={selectedApplication.freelancer.full_name}
+                    freelancerId={selectedApplication.freelancer_id}
                     totalPayment={job.total_payment}
                     onSuccess={handleStakingSuccess}
                 />

@@ -31,15 +31,24 @@ export const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#jobs" className="text-foreground/80 hover:text-foreground transition-colors">
+            <button
+              onClick={() => navigate("/discover")}
+              className="text-foreground/80 hover:text-foreground transition-colors"
+            >
               Find Jobs
-            </a>
-            <a href="#how-it-works" className="text-foreground/80 hover:text-foreground transition-colors">
+            </button>
+            <button
+              onClick={() => navigate("/how-it-works")}
+              className="text-foreground/80 hover:text-foreground transition-colors"
+            >
               How It Works
-            </a>
-            <a href="#about" className="text-foreground/80 hover:text-foreground transition-colors">
+            </button>
+            <button
+              onClick={() => navigate("/about")}
+              className="text-foreground/80 hover:text-foreground transition-colors"
+            >
               About
-            </a>
+            </button>
           </div>
 
           {/* Right Side Actions */}

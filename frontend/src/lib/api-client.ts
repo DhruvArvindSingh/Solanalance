@@ -102,15 +102,15 @@ class ApiClient {
                 fullName: options.options?.data?.full_name || '',
                 role: 'freelancer' // default role
             };
-            return this.register(data);
+            return this.auth.register(data);
         },
 
         signInWithPassword: async (credentials: { email: string; password: string }) => {
-            return this.login(credentials);
+            return this.auth.login(credentials);
         },
 
         getSession: async () => {
-            const userResult = await this.getUser();
+            const userResult = await this.auth.getUser();
             if (userResult.data && !userResult.error) {
                 return {
                     data: {
@@ -174,6 +174,13 @@ class ApiClient {
 
         getApplicants: async (jobId: string) => {
             return this.request(`/jobs/${jobId}/applicants`);
+        },
+
+        update: async (id: string, data: any) => {
+            return this.request(`/jobs/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(data),
+            });
         },
     };
 

@@ -102,7 +102,7 @@ router.get('/my-applications', authenticateToken, requireRole('freelancer'), asy
             created_at: app.createdAt,
             job: {
                 title: app.job.title,
-                total_payment: app.job.totalPayment,
+                total_payment: parseFloat(app.job.totalPayment.toString()),
                 recruiter_name: app.job.recruiter.fullName,
                 company_name: app.job.recruiter.companyName
             }

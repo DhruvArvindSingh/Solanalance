@@ -335,13 +335,50 @@ router.get('/:id/applicants', authenticateToken, requireRole('recruiter'), async
             job: {
                 id: job.id,
                 title: job.title,
-                total_payment: job.totalPayment
+                total_payment: parseFloat(job.totalPayment.toString())
             },
             applications: applicationsWithTrustPoints
         });
     } catch (error) {
         console.error('Get job applicants error:', error);
         res.status(500).json({ error: 'Failed to get job applicants' });
+    }
+});
+
+// Update job (for status updates)
+router.put('/:id', authenticateToken, requireRole('recruiter'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updateData = req.body;
+
+        // Verify job belongs to recruiter
+        const job = await req.prisma.job.findFirst({
+            where: {
+                id,
+                recruiterId: req.user!.id
+            }
+        });
+
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+
+        const updatedJob = await req.prisma.job.update({
+            where: { id },
+            data: updateData
+        });
+
+        res.json({
+            id: updatedJob.id,
+            title: updatedJob.title,
+            description: updatedJob.description,
+            status: updatedJob.status,
+            selectedFreelancerId: updatedJob.selectedFreelancerId,
+            updated_at: updatedJob.updatedAt
+        });
+    } catch (error) {
+        console.error('Update job error:', error);
+        res.status(500).json({ error: 'Failed to update job' });
     }
 });
 

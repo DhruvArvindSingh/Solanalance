@@ -8,6 +8,9 @@ import { SolanaWalletContextProvider } from "./contexts/SolanaWalletContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Discover from "./pages/Discover";
+import HowItWorks from "./pages/HowItWorks";
+import About from "./pages/About";
 import CreateJob from "./pages/CreateJob";
 import JobDetail from "./pages/JobDetail";
 import RecruiterDashboard from "./pages/RecruiterDashboard";
@@ -30,6 +33,9 @@ const App = () => (
           <SolanaWalletContextProvider>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/discover" element={<Discover />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/about" element={<About />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/signup" element={<Auth />} />
               <Route path="/signin" element={<Auth />} />
