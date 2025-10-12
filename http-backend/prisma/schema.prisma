@@ -1,0 +1,369 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum AppRole {
+  recruiter
+  freelancer
+
+  @@map("app_role")
+}
+
+enum JobStatus {
+  draft
+  open
+  in_progress
+  completed
+  cancelled
+
+  @@map("job_status")
+}
+
+enum ExperienceLevel {
+  beginner
+  intermediate
+  expert
+
+  @@map("experience_level")
+}
+
+enum ProjectDuration {
+  short_term
+  medium_term
+  long_term
+
+  @@map("project_duration")
+}
+
+enum RatingTier {
+  gold
+  silver
+  bronze
+  iron
+
+  @@map("rating_tier")
+}
+
+// ============================================================================
+// MODELS
+// ============================================================================
+
+model Profile {
+  id           String    @id @db.Uuid
+  fullName     String    @map("full_name")
+  email        String
+  avatarUrl    String?   @map("avatar_url")
+  bio          String?
+  skills       String[]  @default([])
+  hourlyRate   Decimal?  @map("hourly_rate") @db.Decimal(10, 2)
+  companyName  String?   @map("company_name")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  userRoles                UserRole[]
+  jobsAsRecruiter          Job[]                  @relation("RecruiterJobs")
+  jobsAsSelectedFreelancer Job[]                  @relation("SelectedFreelancer")
+  applications             Application[]
+  projectsAsRecruiter      Project[]              @relation("RecruiterProjects")
+  projectsAsFreelancer     Project[]              @relation("FreelancerProjects")
+  stakings                 Staking[]
+  transactionsFrom         Transaction[]          @relation("TransactionsFrom")
+  transactionsTo           Transaction[]          @relation("TransactionsTo")
+  userWallets              UserWallet[]
+  ratingsGiven             Rating[]               @relation("RaterRatings")
+  ratingsReceived          Rating[]               @relation("RateeRatings")
+  trustPoints              TrustPoint[]
+  messages                 Message[]
+  notifications            Notification[]
+
+  @@map("profiles")
+}
+
+model UserRole {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      AppRole
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([role])
+  @@map("user_roles")
+}
+
+model Job {
+  id                   String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  recruiterId          String            @map("recruiter_id") @db.Uuid
+  title                String
+  description          String
+  skills               String[]          @default([])
+  experienceLevel      ExperienceLevel   @default(intermediate) @map("experience_level")
+  projectDuration      ProjectDuration   @default(medium_term) @map("project_duration")
+  category             String?
+  totalPayment         Decimal           @map("total_payment") @db.Decimal(10, 2)
+  status               JobStatus         @default(open)
+  viewsCount           Int               @default(0) @map("views_count")
+  selectedFreelancerId String?           @map("selected_freelancer_id") @db.Uuid
+  closedAt             DateTime?         @map("closed_at") @db.Timestamptz(6)
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  recruiter          Profile       @relation("RecruiterJobs", fields: [recruiterId], references: [id], onDelete: Cascade)
+  selectedFreelancer Profile?      @relation("SelectedFreelancer", fields: [selectedFreelancerId], references: [id])
+  jobStages          JobStage[]
+  applications       Application[]
+  projects           Project[]
+
+  @@index([recruiterId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@index([skills], type: Gin)
+  @@map("jobs")
+}
+
+model JobStage {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  jobId       String   @map("job_id") @db.Uuid
+  name        String
+  description String?
+  stageNumber Int      @map("stage_number")
+  payment     Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  job        Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  milestones Milestone[]
+
+  @@map("job_stages")
+}
+
+model Application {
+  id                     String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  jobId                  String   @map("job_id") @db.Uuid
+  freelancerId           String   @map("freelancer_id") @db.Uuid
+  coverLetter            String?  @map("cover_letter")
+  estimatedCompletionDays Int     @map("estimated_completion_days")
+  portfolioUrls          String[] @default([]) @map("portfolio_urls")
+  status                 String   @default("pending")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  job        Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  freelancer Profile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([freelancerId])
+  @@index([status])
+  @@map("applications")
+}
+
+model Project {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  jobId        String    @map("job_id") @db.Uuid
+  recruiterId  String    @map("recruiter_id") @db.Uuid
+  freelancerId String    @map("freelancer_id") @db.Uuid
+  status       String    @default("active")
+  currentStage Int       @default(1) @map("current_stage")
+  startedAt    DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  job          Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  recruiter    Profile       @relation("RecruiterProjects", fields: [recruiterId], references: [id], onDelete: Cascade)
+  freelancer   Profile       @relation("FreelancerProjects", fields: [freelancerId], references: [id], onDelete: Cascade)
+  milestones   Milestone[]
+  stakings     Staking[]
+  transactions Transaction[]
+  ratings      Rating[]
+  messages     Message[]
+
+  @@index([recruiterId])
+  @@index([freelancerId])
+  @@index([status])
+  @@map("projects")
+}
+
+model Milestone {
+  id                    String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  projectId             String   @map("project_id") @db.Uuid
+  stageId               String   @map("stage_id") @db.Uuid
+  stageNumber           Int      @map("stage_number")
+  status                String   @default("pending")
+  paymentAmount         Decimal  @map("payment_amount") @db.Decimal(10, 2)
+  paymentReleased       Boolean  @default(false) @map("payment_released")
+  submissionDescription String?  @map("submission_description")
+  submissionFiles       String[] @default([]) @map("submission_files")
+  submissionLinks       String[] @default([]) @map("submission_links")
+  submittedAt           DateTime? @map("submitted_at") @db.Timestamptz(6)
+  reviewedAt            DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  reviewerComments      String?   @map("reviewer_comments")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stage        JobStage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("milestones")
+}
+
+model Staking {
+  id                   String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  projectId            String   @map("project_id") @db.Uuid
+  recruiterId          String   @map("recruiter_id") @db.Uuid
+  walletAddress        String   @map("wallet_address")
+  totalStaked          Decimal  @map("total_staked") @db.Decimal(18, 9)
+  totalReleased        Decimal  @default(0) @map("total_released") @db.Decimal(18, 9)
+  transactionSignature String   @map("transaction_signature")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  recruiter Profile @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  @@map("staking")
+}
+
+model Transaction {
+  id               String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  fromUserId       String    @map("from_user_id") @db.Uuid
+  toUserId         String?   @map("to_user_id") @db.Uuid
+  projectId        String?   @map("project_id") @db.Uuid
+  milestoneId      String?   @map("milestone_id") @db.Uuid
+  type             String
+  amount           Decimal   @db.Decimal(18, 9)
+  walletFrom       String    @map("wallet_from")
+  walletTo         String?   @map("wallet_to")
+  walletSignature  String    @map("wallet_signature")
+  status           String    @default("pending")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  fromUser  Profile    @relation("TransactionsFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser    Profile?   @relation("TransactionsTo", fields: [toUserId], references: [id])
+  project   Project?   @relation(fields: [projectId], references: [id])
+  milestone Milestone? @relation(fields: [milestoneId], references: [id])
+
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([projectId])
+  @@index([type])
+  @@map("transactions")
+}
+
+model UserWallet {
+  id            String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  walletAddress String   @unique @map("wallet_address")
+  isVerified    Boolean  @default(false) @map("is_verified")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_wallets")
+}
+
+model Rating {
+  id                     String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  projectId              String   @map("project_id") @db.Uuid
+  raterId                String   @map("rater_id") @db.Uuid
+  rateeId                String   @map("ratee_id") @db.Uuid
+  overallRating          Int      @map("overall_rating")
+  qualityRating          Int      @map("quality_rating")
+  communicationRating    Int      @map("communication_rating")
+  professionalismRating  Int      @map("professionalism_rating")
+  reviewText             String?  @map("review_text")
+  isPublic               Boolean  @default(true) @map("is_public")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  rater   Profile @relation("RaterRatings", fields: [raterId], references: [id], onDelete: Cascade)
+  ratee   Profile @relation("RateeRatings", fields: [rateeId], references: [id], onDelete: Cascade)
+
+  @@index([rateeId])
+  @@index([raterId])
+  @@index([projectId])
+  @@map("ratings")
+}
+
+model TrustPoint {
+  id                 String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId             String      @map("user_id") @db.Uuid
+  totalPoints        Int         @default(0) @map("total_points")
+  completedProjects  Int         @default(0) @map("completed_projects")
+  successfulProjects Int         @default(0) @map("successful_projects")
+  averageRating      Decimal?    @map("average_rating") @db.Decimal(3, 2)
+  tier               RatingTier  @default(iron)
+  lastCalculatedAt   DateTime    @default(now()) @map("last_calculated_at") @db.Timestamptz(6)
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("trust_points")
+}
+
+model Message {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  senderId    String   @map("sender_id") @db.Uuid
+  content     String
+  messageType String   @default("text") @map("message_type")
+  fileUrl     String?  @map("file_url")
+  fileName    String?  @map("file_name")
+  fileSize    Int?     @map("file_size")
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sender  Profile @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([senderId])
+  @@index([createdAt(sort: Desc)])
+  @@map("messages")
+}
+
+model Notification {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String
+  message   String
+  type      String
+  relatedId String?  @map("related_id") @db.Uuid
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
