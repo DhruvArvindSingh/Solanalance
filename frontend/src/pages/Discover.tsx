@@ -4,6 +4,7 @@ import { JobDashboard } from "@/components/JobDashboard";
 const Discover = () => {
     return (
         <div className="min-h-screen bg-background">
+
             <Navbar />
 
             {/* Header */}
