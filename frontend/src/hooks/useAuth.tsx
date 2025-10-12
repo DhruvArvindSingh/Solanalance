@@ -1,11 +1,18 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { apiClient } from '@/lib/api-client';
 import { useNavigate } from 'react-router-dom';
+
+interface User {
+  id: string;
+  email: string;
+  fullName: string;
+  avatarUrl?: string;
+  bio?: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
+  session: { user: User } | null;
   userRole: 'recruiter' | 'freelancer' | null;
   loading: boolean;
   signOut: () => Promise<void>;
@@ -16,70 +23,68 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   userRole: null,
   loading: true,
-  signOut: async () => {},
+  signOut: async () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<{ user: User } | null>(null);
   const [userRole, setUserRole] = useState<'recruiter' | 'freelancer' | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Defer role fetching
-        if (session?.user) {
-          setTimeout(() => {
-            fetchUserRole(session.user.id);
-          }, 0);
-        } else {
-          setUserRole(null);
-        }
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserRole(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    checkAuthStatus();
   }, []);
 
-  const fetchUserRole = async (userId: string) => {
+  const checkAuthStatus = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
+      setLoading(true);
+      const token = localStorage.getItem('token');
 
-      if (error) {
-        console.error('Error fetching user role:', error);
-        return;
+      if (token) {
+        apiClient.setToken(token);
+        const { data, error } = await apiClient.auth.getUser();
+
+        if (data && !error) {
+          const userData = {
+            id: data.id,
+            email: data.email,
+            fullName: data.fullName,
+            avatarUrl: data.avatarUrl,
+            bio: data.bio
+          };
+
+          setUser(userData);
+          setSession({ user: userData });
+          setUserRole(data.role);
+        } else {
+          // Invalid token
+          localStorage.removeItem('token');
+          apiClient.setToken(null);
+          setUser(null);
+          setSession(null);
+          setUserRole(null);
+        }
+      } else {
+        setUser(null);
+        setSession(null);
+        setUserRole(null);
       }
-
-      setUserRole(data?.role || null);
     } catch (error) {
-      console.error('Error fetching user role:', error);
+      console.error('Error checking auth status:', error);
+      setUser(null);
+      setSession(null);
+      setUserRole(null);
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await apiClient.auth.signOut();
     setUser(null);
     setSession(null);
     setUserRole(null);

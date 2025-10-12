@@ -24,6 +24,7 @@ interface StakingModalProps {
     jobId: string;
     jobTitle: string;
     freelancerName: string;
+    freelancerId: string;
     totalPayment: number;
     onSuccess: () => void;
 }
@@ -34,6 +35,7 @@ export const StakingModal = ({
     jobId,
     jobTitle,
     freelancerName,
+    freelancerId,
     totalPayment,
     onSuccess,
 }: StakingModalProps) => {
@@ -100,79 +102,16 @@ export const StakingModal = ({
             // Wait for confirmation
             await connection.confirmTransaction(signature, "confirmed");
 
-            // Create project in database
-            const { data: projectData, error: projectError } = await supabase
-                .from("projects")
-                .insert({
-                    job_id: jobId,
-                    recruiter_id: user.id,
-                    freelancer_id: (await supabase
-                        .from("applications")
-                        .select("freelancer_id")
-                        .eq("job_id", jobId)
-                        .eq("status", "pending")
-                        .limit(1)
-                        .single()).data?.freelancer_id,
-                    current_stage: 1,
-                    status: "in_progress",
-                })
-                .select()
-                .single();
-
-            if (projectError) throw projectError;
-
-            // Create staking record
-            const { error: stakingError } = await supabase
-                .from("staking")
-                .insert({
-                    project_id: projectData.id,
-                    recruiter_id: user.id,
-                    total_staked: stakeAmount,
-                    total_released: 0,
-                    wallet_address: publicKey.toBase58(),
-                    transaction_signature: signature,
-                });
-
-            if (stakingError) throw stakingError;
-
-            // Create initial milestones for the project
-            const { data: stages } = await supabase
-                .from("job_stages")
-                .select("*")
-                .eq("job_id", jobId)
-                .order("stage_number");
-
-            if (stages) {
-                const milestones = stages.map((stage: any) => ({
-                    project_id: projectData.id,
-                    stage_id: stage.id,
-                    stage_number: stage.stage_number,
-                    status: stage.stage_number === 1 ? "in_progress" : "pending",
-                    payment_amount: stage.payment,
-                }));
-
-                await supabase.from("milestones").insert(milestones);
-            }
-
-            // Record transaction
-            await supabase.from("transactions").insert({
-                project_id: projectData.id,
-                from_user_id: user.id,
-                amount: stakeAmount,
-                type: "stake",
-                wallet_signature: signature,
-                wallet_from: publicKey.toBase58(),
-                status: "confirmed",
+            // Create project and staking through backend API
+            const { data: stakingData, error: stakingError } = await supabase.staking.create({
+                jobId,
+                freelancerId,
+                totalStaked: stakeAmount,
+                walletAddress: publicKey.toBase58(),
+                transactionSignature: signature,
             });
 
-            // Create notification for freelancer
-            await supabase.from("notifications").insert({
-                user_id: projectData.freelancer_id,
-                title: "You've been selected!",
-                message: `You have been selected for "${jobTitle}". The recruiter has staked ${stakeAmount.toFixed(2)} SOL.`,
-                type: "application",
-                related_id: projectData.id,
-            });
+            if (stakingError) throw new Error(stakingError);
 
             toast.success("Staking successful! Project started.");
             onSuccess();

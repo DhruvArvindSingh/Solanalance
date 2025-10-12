@@ -76,63 +76,48 @@ export default function JobDetail() {
 
     const fetchJobDetails = async () => {
         try {
-            // Fetch job
-            const { data: jobData, error: jobError } = await supabase
-                .from("jobs")
-                .select("*")
-                .eq("id", id)
-                .single();
+            // Fetch job (includes all related data)
+            const { data: jobData, error: jobError } = await supabase.jobs.getById(id!);
 
-            if (jobError) throw jobError;
-            setJob(jobData);
+            if (jobError) throw new Error(jobError);
 
-            // Fetch stages
-            const { data: stagesData, error: stagesError } = await supabase
-                .from("job_stages")
-                .select("*")
-                .eq("job_id", id)
-                .order("stage_number");
+            if (jobData) {
+                setJob({
+                    id: jobData.id,
+                    title: jobData.title,
+                    description: jobData.description,
+                    skills: jobData.skills,
+                    experience_level: jobData.experience_level,
+                    project_duration: jobData.project_duration,
+                    category: jobData.category,
+                    status: jobData.status,
+                    total_payment: jobData.total_payment,
+                    views_count: jobData.views_count,
+                    created_at: jobData.created_at,
+                    recruiter_id: jobData.recruiter_id
+                });
 
-            if (stagesError) throw stagesError;
-            setStages(stagesData || []);
+                setStages(jobData.stages || []);
+                setApplicantsCount(jobData.applicants_count || 0);
 
-            // Fetch recruiter profile
-            const { data: profileData, error: profileError } = await supabase
-                .from("profiles")
-                .select("full_name, company_name, avatar_url")
-                .eq("id", jobData.recruiter_id)
-                .single();
+                // Set recruiter profile
+                if (jobData.recruiter) {
+                    setRecruiterProfile({
+                        full_name: jobData.recruiter.full_name,
+                        company_name: jobData.recruiter.company_name,
+                        avatar_url: jobData.recruiter.avatar_url
+                    });
+                }
 
-            if (profileError) throw profileError;
-            setRecruiterProfile(profileData);
-
-            // Fetch recruiter tier
-            const { data: tierData } = await supabase
-                .from("trust_points")
-                .select("tier")
-                .eq("user_id", jobData.recruiter_id)
-                .single();
-
-            if (tierData) setRecruiterTier(tierData.tier);
-
-            // Fetch applicants count
-            const { count } = await supabase
-                .from("applications")
-                .select("*", { count: "exact", head: true })
-                .eq("job_id", id);
-
-            setApplicantsCount(count || 0);
-
-            // Check if current user has applied
-            if (user) {
-                const { data: applicationData } = await supabase
-                    .from("applications")
-                    .select("id")
-                    .eq("job_id", id)
-                    .eq("freelancer_id", user.id)
-                    .single();
-
-                setHasApplied(!!applicationData);
+                // Check if current user has applied
+                if (user) {
+                    const { data: applicationData, error: appError } = await supabase.applications.checkApplication(id!);
+                    console.log("applicationData", applicationData);
+                    console.log("appError", appError);
+                    if (!appError && applicationData) {
+                        setHasApplied(applicationData.hasApplied);
+                    }
+                }
             }
         } catch (error: any) {
             console.error("Error fetching job:", error);
@@ -146,7 +131,8 @@ export default function JobDetail() {
         if (!id) return;
 
         try {
-            await supabase.rpc("increment_job_views", { job_uuid: id });
+            // View count is now automatically incremented by the getById endpoint
+            // No need for a separate RPC call
         } catch (error) {
             console.error("Error incrementing views:", error);
         }

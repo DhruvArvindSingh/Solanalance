@@ -68,60 +68,29 @@ export const JobDashboard = () => {
     try {
       setLoading(true);
 
-      // Fetch jobs with recruiter info directly (fallback if view doesn't exist)
-      const { data, error } = await supabase
-        .from("jobs")
-        .select(`
-          id,
-          title,
-          description,
-          skills,
-          experience_level,
-          project_duration,
-          total_payment,
-          status,
-          views_count,
-          created_at,
-          recruiter_id,
-          profiles!jobs_recruiter_id_fkey (
-            full_name,
-            company_name,
-            avatar_url
-          ),
-          trust_points (
-            tier
-          )
-        `)
-        .eq("status", "open")
-        .order("created_at", { ascending: false });
+      // Fetch jobs using our API client
+      const { data, error } = await supabase.jobs.getAll({
+        status: "open",
+        limit: 100 // Fetch more jobs for better filtering
+      });
 
-      if (error) throw error;
+      if (error) throw new Error(error);
 
-      // Transform data to match our interface and get applicants count
-      const transformedJobs = await Promise.all(
-        (data || []).map(async (job: any) => {
-          // Get applicants count for each job
-          const { count } = await supabase
-            .from("applications")
-            .select("*", { count: "exact", head: true })
-            .eq("job_id", job.id);
-
-          return {
-            id: job.id,
-            title: job.title,
-            description: job.description,
-            skills: job.skills || [],
-            total_payment: job.total_payment,
-            created_at: job.created_at,
-            views_count: job.views_count || 0,
-            recruiter_name: job.profiles?.full_name || "Unknown",
-            company_name: job.profiles?.company_name || null,
-            recruiter_avatar: job.profiles?.avatar_url || null,
-            recruiter_tier: job.trust_points?.[0]?.tier || "iron",
-            applicants_count: count || 0,
-          };
-        })
-      );
+      // Transform data to match our interface
+      const transformedJobs = (data || []).map((job: any) => ({
+        id: job.id,
+        title: job.title,
+        description: job.description,
+        skills: job.skills || [],
+        total_payment: job.total_payment,
+        created_at: job.created_at,
+        views_count: job.views_count || 0,
+        recruiter_name: job.recruiter?.full_name || "Unknown",
+        company_name: job.recruiter?.company_name || null,
+        recruiter_avatar: job.recruiter?.avatar_url || null,
+        recruiter_tier: "iron", // Default tier since we don't have this in the API response
+        applicants_count: job.applicants_count || 0,
+      }));
 
       setJobs(transformedJobs);
 

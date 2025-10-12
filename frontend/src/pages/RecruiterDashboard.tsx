@@ -48,36 +48,12 @@ export default function RecruiterDashboard() {
         try {
             setLoading(true);
 
-            // Fetch jobs
-            const { data: jobsData, error: jobsError } = await supabase
-                .from("jobs")
-                .select(`
-          id,
-          title,
-          status,
-          total_payment,
-          created_at
-        `)
-                .eq("recruiter_id", user.id)
-                .order("created_at", { ascending: false });
+            // Fetch jobs for recruiter
+            const { data: jobsData, error: jobsError } = await supabase.jobs.getRecruiterJobs();
 
-            if (jobsError) throw jobsError;
+            if (jobsError) throw new Error(jobsError);
 
-            // For each job, fetch applicants count
-            const jobsWithStats = await Promise.all(
-                (jobsData || []).map(async (job) => {
-                    const { count } = await supabase
-                        .from("applications")
-                        .select("*", { count: "exact", head: true })
-                        .eq("job_id", job.id);
-
-                    return {
-                        ...job,
-                        applicants_count: count || 0,
-                    };
-                })
-            );
-
+            const jobsWithStats = jobsData || [];
             setJobs(jobsWithStats);
 
             // Calculate stats
@@ -86,21 +62,10 @@ export default function RecruiterDashboard() {
             const inProgressJobs = jobsWithStats.filter((j) => j.status === "in_progress").length;
             const completedJobs = jobsWithStats.filter((j) => j.status === "completed").length;
 
-            // Fetch total spent from projects
-            const { data: projectsData } = await supabase
-                .from("projects")
-                .select("job_id")
-                .eq("recruiter_id", user.id);
-
-            let totalSpent = 0;
-            if (projectsData) {
-                for (const project of projectsData) {
-                    const job = jobsWithStats.find((j) => j.id === project.job_id);
-                    if (job && job.status === "completed") {
-                        totalSpent += job.total_payment;
-                    }
-                }
-            }
+            // Calculate total spent (sum of completed job payments)
+            const totalSpent = jobsWithStats
+                .filter(job => job.status === "completed")
+                .reduce((sum, job) => sum + job.total_payment, 0);
 
             setStats({
                 totalJobs,

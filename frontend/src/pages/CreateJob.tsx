@@ -102,55 +102,38 @@ export default function CreateJob() {
         setIsSubmitting(true);
 
         try {
-            // Insert job
-            const { data: job, error: jobError } = await supabase
-                .from("jobs")
-                .insert({
-                    recruiter_id: user.id,
-                    title: formData.title,
-                    description: formData.description,
-                    skills: formData.skills,
-                    experience_level: formData.experienceLevel,
-                    project_duration: formData.projectDuration,
-                    category: formData.category,
-                    status: isDraft ? "draft" : "open",
-                    total_payment: formData.totalPayment,
-                })
-                .select()
-                .single();
+            // Create job with stages
+            const jobData = {
+                title: formData.title,
+                description: formData.description,
+                skills: formData.skills,
+                experienceLevel: formData.experienceLevel,
+                projectDuration: formData.projectDuration,
+                category: formData.category,
+                status: isDraft ? "draft" : "open",
+                totalPayment: formData.totalPayment,
+                stages: [
+                    {
+                        name: formData.stage1Name,
+                        description: formData.stage1Description,
+                        payment: formData.stage1Payment,
+                    },
+                    {
+                        name: formData.stage2Name,
+                        description: formData.stage2Description,
+                        payment: formData.stage2Payment,
+                    },
+                    {
+                        name: formData.stage3Name,
+                        description: formData.stage3Description,
+                        payment: formData.stage3Payment,
+                    },
+                ]
+            };
 
-            if (jobError) throw jobError;
+            const { data, error } = await supabase.jobs.create(jobData);
 
-            // Insert job stages
-            const stages = [
-                {
-                    job_id: job.id,
-                    stage_number: 1,
-                    name: formData.stage1Name,
-                    description: formData.stage1Description,
-                    payment: formData.stage1Payment,
-                },
-                {
-                    job_id: job.id,
-                    stage_number: 2,
-                    name: formData.stage2Name,
-                    description: formData.stage2Description,
-                    payment: formData.stage2Payment,
-                },
-                {
-                    job_id: job.id,
-                    stage_number: 3,
-                    name: formData.stage3Name,
-                    description: formData.stage3Description,
-                    payment: formData.stage3Payment,
-                },
-            ];
-
-            const { error: stagesError } = await supabase
-                .from("job_stages")
-                .insert(stages);
-
-            if (stagesError) throw stagesError;
+            if (error) throw new Error(error);
 
             toast.success(isDraft ? "Job saved as draft!" : "Job posted successfully!");
             navigate("/dashboard/recruiter");
@@ -199,10 +182,10 @@ export default function CreateJob() {
                             >
                                 <div
                                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep > step.number
-                                            ? "bg-gradient-solana text-background"
-                                            : currentStep === step.number
-                                                ? "bg-primary text-primary-foreground"
-                                                : "bg-muted text-muted-foreground"
+                                        ? "bg-gradient-solana text-background"
+                                        : currentStep === step.number
+                                            ? "bg-primary text-primary-foreground"
+                                            : "bg-muted text-muted-foreground"
                                         }`}
                                 >
                                     {currentStep > step.number ? (

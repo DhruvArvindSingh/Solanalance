@@ -86,78 +86,27 @@ export default function UserProfile() {
         try {
             setLoading(true);
 
-            // Fetch profile
-            const { data: profileData, error: profileError } = await supabase
-                .from("profiles")
-                .select("*")
-                .eq("id", id)
-                .single();
+            // Fetch profile (includes role and trust points)
+            const { data: profileData, error: profileError } = await supabase.profile.getById(id);
 
-            if (profileError) throw profileError;
-            setProfile(profileData);
+            if (profileError) throw new Error(profileError);
 
-            // Fetch user role
-            const { data: roleData } = await supabase
-                .from("user_roles")
-                .select("role")
-                .eq("user_id", id)
-                .single();
+            if (profileData) {
+                setProfile({
+                    id: profileData.id,
+                    full_name: profileData.full_name,
+                    email: profileData.email,
+                    avatar_url: profileData.avatar_url,
+                    bio: profileData.bio,
+                    skills: profileData.skills,
+                    hourly_rate: profileData.hourly_rate,
+                    company_name: profileData.company_name,
+                    created_at: profileData.created_at
+                });
 
-            setUserRole(roleData?.role || null);
-
-            // Fetch trust points
-            const { data: trustData } = await supabase
-                .from("trust_points")
-                .select("*")
-                .eq("user_id", id)
-                .single();
-
-            setTrustPoints(trustData);
-
-            // Fetch public ratings with rater info
-            const { data: ratingsData } = await supabase
-                .from("ratings")
-                .select(`
-          id,
-          overall_rating,
-          communication_rating,
-          quality_rating,
-          professionalism_rating,
-          review_text,
-          created_at,
-          profiles!ratings_rater_id_fkey (
-            full_name,
-            avatar_url
-          ),
-          projects!inner (
-            jobs!inner (
-              title
-            )
-          )
-        `)
-                .eq("ratee_id", id)
-                .eq("is_public", true)
-                .order("created_at", { ascending: false })
-                .limit(10);
-
-            if (ratingsData) {
-                const transformedRatings = ratingsData.map((r: any) => ({
-                    id: r.id,
-                    overall_rating: r.overall_rating,
-                    communication_rating: r.communication_rating,
-                    quality_rating: r.quality_rating,
-                    professionalism_rating: r.professionalism_rating,
-                    review_text: r.review_text,
-                    created_at: r.created_at,
-                    rater: {
-                        full_name: r.profiles?.full_name || "Anonymous",
-                        avatar_url: r.profiles?.avatar_url,
-                    },
-                    project: {
-                        job_title: r.projects?.jobs?.title || "Unknown Project",
-                    },
-                }));
-                setRatings(transformedRatings);
+                setUserRole(profileData.role);
+                setTrustPoints(profileData.trust_points);
+                setRatings(profileData.ratings || []);
             }
         } catch (error: any) {
             console.error("Error fetching profile:", error);

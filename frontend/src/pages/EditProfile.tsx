@@ -40,13 +40,9 @@ export default function EditProfile() {
         if (!user) return;
 
         try {
-            const { data, error } = await supabase
-                .from("profiles")
-                .select("*")
-                .eq("id", user.id)
-                .single();
+            const { data, error } = await supabase.profile.getById(user.id);
 
-            if (error) throw error;
+            if (error) throw new Error(error);
 
             if (data) {
                 setFullName(data.full_name || "");
@@ -97,19 +93,16 @@ export default function EditProfile() {
         setSaving(true);
 
         try {
-            const { error } = await supabase
-                .from("profiles")
-                .update({
-                    full_name: fullName,
-                    bio: bio || null,
-                    company_name: companyName || null,
-                    hourly_rate: hourlyRate > 0 ? hourlyRate : null,
-                    skills: skills,
-                    avatar_url: avatarUrl || null,
-                })
-                .eq("id", user.id);
+            const { data, error } = await supabase.profile.update({
+                fullName,
+                bio: bio || null,
+                companyName: companyName || null,
+                hourlyRate: hourlyRate > 0 ? hourlyRate : null,
+                skills: skills,
+                avatarUrl: avatarUrl || null,
+            });
 
-            if (error) throw error;
+            if (error) throw new Error(error);
 
             toast.success("Profile updated successfully!");
             navigate(`/profile/${user.id}`);

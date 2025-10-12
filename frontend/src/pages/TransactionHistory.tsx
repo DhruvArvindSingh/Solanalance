@@ -68,41 +68,11 @@ export default function TransactionHistory() {
         try {
             setLoading(true);
 
-            const { data, error } = await supabase
-                .from("transactions")
-                .select(`
-          id,
-          amount,
-          type,
-          wallet_signature,
-          wallet_from,
-          wallet_to,
-          status,
-          created_at,
-          projects (
-            jobs (
-              title
-            )
-          )
-        `)
-                .or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`)
-                .order("created_at", { ascending: false });
+            const { data, error } = await supabase.transactions.getMyTransactions();
 
-            if (error) throw error;
+            if (error) throw new Error(error);
 
-            const transformedTransactions = (data || []).map((t: any) => ({
-                id: t.id,
-                amount: t.amount,
-                type: t.type,
-                wallet_signature: t.wallet_signature,
-                wallet_from: t.wallet_from,
-                wallet_to: t.wallet_to,
-                status: t.status,
-                created_at: t.created_at,
-                project: t.projects?.jobs ? { job_title: t.projects.jobs.title } : null,
-            }));
-
-            setTransactions(transformedTransactions);
+            setTransactions(data || []);
         } catch (error: any) {
             console.error("Error fetching transactions:", error);
         } finally {

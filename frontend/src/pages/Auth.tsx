@@ -30,38 +30,21 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.register({
         email,
         password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-          emailRedirectTo: `${window.location.origin}/`,
-        },
+        fullName,
+        role,
       });
 
-      if (error) throw error;
-
-      if (data.user) {
-        // Insert user role
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .insert({
-            user_id: data.user.id,
-            role: role,
-          });
-
-        if (roleError) {
-          console.error("Error creating role:", roleError);
-          toast.error("Account created but role assignment failed. Please contact support.");
-        } else {
-          toast.success("Account created successfully! Please sign in.");
-          setEmail("");
-          setPassword("");
-          setFullName("");
-        }
+      if (error) {
+        throw new Error(error);
       }
+
+      toast.success("Account created successfully! Please sign in.");
+      setEmail("");
+      setPassword("");
+      setFullName("");
     } catch (error: any) {
       toast.error(error.message || "Error signing up");
     } finally {
@@ -74,12 +57,14 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.login({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error);
+      }
 
       toast.success("Signed in successfully!");
       navigate("/");

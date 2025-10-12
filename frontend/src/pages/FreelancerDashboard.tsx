@@ -71,103 +71,42 @@ export default function FreelancerDashboard() {
         try {
             setLoading(true);
 
-            // Fetch applications with job info
-            const { data: applicationsData, error: applicationsError } = await supabase
-                .from("applications")
-                .select(`
-          id,
-          job_id,
-          status,
-          created_at,
-          jobs (
-            title,
-            total_payment,
-            profiles!jobs_recruiter_id_fkey (
-              full_name,
-              company_name
-            )
-          )
-        `)
-                .eq("freelancer_id", user.id)
-                .order("created_at", { ascending: false });
+            // Fetch applications
+            const { data: applicationsData, error: applicationsError } = await supabase.applications.getMyApplications();
 
-            if (applicationsError) throw applicationsError;
+            if (applicationsError) throw new Error(applicationsError);
 
-            // Transform applications data
-            const transformedApplications = (applicationsData || []).map((app: any) => ({
-                id: app.id,
-                job_id: app.job_id,
-                status: app.status,
-                created_at: app.created_at,
-                job: {
-                    title: app.jobs?.title || "Unknown Job",
-                    total_payment: app.jobs?.total_payment || 0,
-                    recruiter_name: app.jobs?.profiles?.full_name || "Unknown",
-                    company_name: app.jobs?.profiles?.company_name,
-                },
-            }));
-
-            setApplications(transformedApplications);
+            setApplications(applicationsData || []);
 
             // Fetch projects
-            const { data: projectsData, error: projectsError } = await supabase
-                .from("projects")
-                .select(`
-          id,
-          status,
-          current_stage,
-          started_at,
-          jobs (
-            id,
-            title,
-            total_payment
-          )
-        `)
-                .eq("freelancer_id", user.id)
-                .order("started_at", { ascending: false });
+            const { data: projectsData, error: projectsError } = await supabase.projects.getMyProjects();
 
-            if (projectsError) throw projectsError;
+            if (projectsError) throw new Error(projectsError);
 
-            const transformedProjects = (projectsData || []).map((proj: any) => ({
-                id: proj.id,
-                status: proj.status,
-                current_stage: proj.current_stage,
-                started_at: proj.started_at,
-                job: {
-                    id: proj.jobs?.id || "",
-                    title: proj.jobs?.title || "Unknown Project",
-                    total_payment: proj.jobs?.total_payment || 0,
-                },
-            }));
+            setProjects(projectsData || []);
 
-            setProjects(transformedProjects);
+            // Fetch trust points from user profile
+            const { data: profileData, error: profileError } = await supabase.profile.getById(user.id);
 
-            // Fetch trust points
-            const { data: trustData, error: trustError } = await supabase
-                .from("trust_points")
-                .select("*")
-                .eq("user_id", user.id)
-                .single();
-
-            if (!trustError && trustData) {
+            if (!profileError && profileData && profileData.trust_points) {
                 setTrustPoints({
-                    total_points: trustData.total_points,
-                    completed_projects: trustData.completed_projects,
-                    tier: trustData.tier,
-                    average_rating: trustData.average_rating || 0,
+                    total_points: profileData.trust_points.total_points,
+                    completed_projects: profileData.trust_points.completed_projects,
+                    tier: profileData.trust_points.tier,
+                    average_rating: profileData.trust_points.average_rating || 0,
                 });
             }
 
             // Calculate stats
-            const totalApplications = transformedApplications.length;
-            const activeProjects = transformedProjects.filter(
+            const totalApplications = (applicationsData || []).length;
+            const activeProjects = (projectsData || []).filter(
                 (p) => p.status === "in_progress"
             ).length;
-            const completedProjects = transformedProjects.filter(
+            const completedProjects = (projectsData || []).filter(
                 (p) => p.status === "completed"
             ).length;
 
-            const totalEarned = transformedProjects
+            const totalEarned = (projectsData || [])
                 .filter((p) => p.status === "completed")
                 .reduce((sum, p) => sum + p.job.total_payment, 0);
 
