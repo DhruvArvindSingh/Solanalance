@@ -20,6 +20,8 @@ import {
     Clock,
     Star,
     Briefcase,
+    FileText,
+    Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -38,6 +40,8 @@ interface Application {
     id: string;
     freelancer_id: string;
     cover_letter: string | null;
+    cover_letter_file_url: string | null;
+    resume_file_url: string | null;
     estimated_completion_days: number;
     portfolio_urls: string[] | null;
     status: string;
@@ -260,10 +264,50 @@ export default function JobApplicants() {
                             <>
                                 <Separator className="my-3" />
                                 <div>
-                                    <p className="text-sm font-medium mb-1">Cover Letter</p>
+                                    <p className="text-sm font-medium mb-1">Cover Letter Text</p>
                                     <p className="text-sm text-muted-foreground">
                                         {application.cover_letter}
                                     </p>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Resume File URL */}
+                        {application.resume_file_url && (
+                            <>
+                                <Separator className="my-3" />
+                                <div>
+                                    <p className="text-sm font-medium mb-2">Resume (PDF)</p>
+                                    <a
+                                        href={application.resume_file_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-3 py-2 bg-primary/10 hover:bg-primary/20 rounded-md text-sm text-primary hover:text-primary/80 transition-colors"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        <span>Download Resume</span>
+                                        <Download className="w-3 h-3" />
+                                    </a>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Cover Letter File URL */}
+                        {application.cover_letter_file_url && (
+                            <>
+                                <Separator className="my-3" />
+                                <div>
+                                    <p className="text-sm font-medium mb-2">Cover Letter (PDF)</p>
+                                    <a
+                                        href={application.cover_letter_file_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-3 py-2 bg-primary/10 hover:bg-primary/20 rounded-md text-sm text-primary hover:text-primary/80 transition-colors"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        <span>Download Cover Letter</span>
+                                        <Download className="w-3 h-3" />
+                                    </a>
                                 </div>
                             </>
                         )}

@@ -103,12 +103,14 @@ export const ApplicationModal = ({
                 formData.append('coverLetter', coverLetterFile);
             }
 
+            // Debug: Check token
+            const token = localStorage.getItem('token');
+            console.log('Token available:', !!token);
+            console.log('Auth header will be sent:', token ? `Bearer ${token.substring(0, 20)}...` : 'No token');
+
             const { data, error } = await apiClient.request('/applications', {
                 method: 'POST',
                 body: formData,
-                headers: {
-                    // Don't set Content-Type, let the browser set it for FormData
-                }
             });
 
             if (error) {

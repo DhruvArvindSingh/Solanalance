@@ -1,6 +1,6 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { authenticateToken, requireRole } from '../middleware/auth';
-import multer from 'multer';
+import multer, { FileFilterCallback } from 'multer';
 import { uploadFileToS3 } from '../utils/s3Upload';
 
 const router = express.Router();
@@ -11,7 +11,7 @@ const upload = multer({
     limits: {
         fileSize: 10 * 1024 * 1024, // 10 MB
     },
-    fileFilter: (req, file, cb) => {
+    fileFilter: (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
         if (file.mimetype === 'application/pdf') {
             cb(null, true);
         } else {
@@ -28,7 +28,7 @@ router.post('/',
         { name: 'resume', maxCount: 1 },
         { name: 'coverLetter', maxCount: 1 }
     ]),
-    async (req: any, res) => {
+    async (req: any, res: Response) => {
         try {
             const {
                 jobId,
@@ -38,7 +38,7 @@ router.post('/',
             } = req.body;
 
             const freelancerId = req.user?.id;
-            const files = req.files as { [key: string]: Express.Multer.File[] } || {};
+            const files = (req.files as Record<string, Express.Multer.File[]>) || {};
             const resumeFile = files['resume']?.[0];
             const coverLetterFile = files['coverLetter']?.[0];
 

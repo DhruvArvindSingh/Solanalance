@@ -6,11 +6,22 @@ interface ApiResponse<T = any> {
 
 class ApiClient {
     private baseURL: string;
-    private token: string | null = null;
 
     constructor() {
         this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-        this.token = localStorage.getItem('token');
+    }
+
+    // Get current token from localStorage
+    private getToken(): string | null {
+        return localStorage.getItem('token');
+    }
+
+    public setToken(token: string | null): void {
+        if (token) {
+            localStorage.setItem('token', token);
+        } else {
+            localStorage.removeItem('token');
+        }
     }
 
     public async request<T = any>(
@@ -18,6 +29,7 @@ class ApiClient {
         options: RequestInit = {}
     ): Promise<ApiResponse<T>> {
         const url = `${this.baseURL}${endpoint}`;
+        const token = this.getToken(); // Get fresh token from localStorage
 
         // Check if body is FormData
         const isFormData = options.body instanceof FormData;
@@ -25,12 +37,12 @@ class ApiClient {
         const config: RequestInit = {
             headers: isFormData
                 ? {
-                    ...(this.token && { Authorization: `Bearer ${this.token}` }),
+                    ...(token && { Authorization: `Bearer ${token}` }),
                     ...options.headers,
                 }
                 : {
                     'Content-Type': 'application/json',
-                    ...(this.token && { Authorization: `Bearer ${this.token}` }),
+                    ...(token && { Authorization: `Bearer ${token}` }),
                     ...options.headers,
                 },
             ...options,
@@ -57,15 +69,6 @@ class ApiClient {
                 data: null,
                 error: (error as Error).message || 'Network error'
             };
-        }
-    }
-
-    setToken(token: string | null) {
-        this.token = token;
-        if (token) {
-            localStorage.setItem('token', token);
-        } else {
-            localStorage.removeItem('token');
         }
     }
 

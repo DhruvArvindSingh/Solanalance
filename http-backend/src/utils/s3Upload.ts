@@ -1,11 +1,10 @@
 import s3 from '../config/s3';
-import { Request, Response } from 'express';
 
 interface FileUploadOptions {
     userId: string;
     jobId: string;
     fileType: 'resume' | 'cover_letter';
-    file: Express.Multer.File;
+    file: any;
 }
 
 export const uploadFileToS3 = async (options: FileUploadOptions): Promise<string> => {
@@ -26,7 +25,7 @@ export const uploadFileToS3 = async (options: FileUploadOptions): Promise<string
     // Create S3 key path
     const timestamp = Date.now();
     const fileName = `${fileType}_${timestamp}.pdf`;
-    const s3Key = `${userId}/${jobId}/${fileType}/${fileName}`;
+    const s3Key = `_main/${userId}/${jobId}/${fileType}/${fileName}`;
 
     const params = {
         Bucket: process.env.AWS_BUCKET_NAME || 'solanalance-uploads',

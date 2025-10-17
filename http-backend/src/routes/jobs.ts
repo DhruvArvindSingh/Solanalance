@@ -310,6 +310,8 @@ router.get('/:id/applicants', authenticateToken, requireRole('recruiter'), async
                     id: app.id,
                     freelancer_id: app.freelancerId,
                     cover_letter: app.coverLetter,
+                    cover_letter_file_url: app.coverLetterFileUrl,
+                    resume_file_url: app.resumeFileUrl,
                     estimated_completion_days: app.estimatedCompletionDays,
                     portfolio_urls: app.portfolioUrls,
                     status: app.status,
