@@ -13,18 +13,26 @@ class ApiClient {
         this.token = localStorage.getItem('token');
     }
 
-    private async request<T = any>(
+    public async request<T = any>(
         endpoint: string,
         options: RequestInit = {}
     ): Promise<ApiResponse<T>> {
         const url = `${this.baseURL}${endpoint}`;
 
+        // Check if body is FormData
+        const isFormData = options.body instanceof FormData;
+
         const config: RequestInit = {
-            headers: {
-                'Content-Type': 'application/json',
-                ...(this.token && { Authorization: `Bearer ${this.token}` }),
-                ...options.headers,
-            },
+            headers: isFormData
+                ? {
+                    ...(this.token && { Authorization: `Bearer ${this.token}` }),
+                    ...options.headers,
+                }
+                : {
+                    'Content-Type': 'application/json',
+                    ...(this.token && { Authorization: `Bearer ${this.token}` }),
+                    ...options.headers,
+                },
             ...options,
         };
 
@@ -33,13 +41,22 @@ class ApiClient {
             const result = await response.json();
 
             if (!response.ok) {
-                return { error: result.error || 'Request failed' };
+                return {
+                    data: null,
+                    error: result.error || 'An error occurred'
+                };
             }
 
-            return { data: result };
+            return {
+                data: result,
+                error: null
+            };
         } catch (error) {
-            console.error('API request failed:', error);
-            return { error: 'Network error' };
+            console.error(`Request failed for ${endpoint}:`, error);
+            return {
+                data: null,
+                error: (error as Error).message || 'Network error'
+            };
         }
     }
 
@@ -59,6 +76,7 @@ class ApiClient {
             password: string;
             fullName: string;
             role: string;
+            walletAddress: string;
         }) => {
             const result = await this.request('/auth/register', {
                 method: 'POST',
@@ -361,7 +379,7 @@ class ApiClient {
     }
 }
 
-export const apiClient = new ApiClient();
+export const a = new ApiClient();
 
-// Export for compatibility with existing code that imports { supabase }
-export const supabase = apiClient;
+// Export for compatibility with existing code that imports { apiClient }
+export const apiClient = a;

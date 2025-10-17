@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,7 +86,7 @@ export default function JobApplicants() {
             setLoading(true);
 
             // Fetch job applications (includes job verification and all related data)
-            const { data, error } = await supabase.jobs.getApplicants(id);
+            const { data, error } = await apiClient.jobs.getApplicants(id);
 
             if (error) throw new Error(error);
 
@@ -112,13 +112,13 @@ export default function JobApplicants() {
 
         try {
             // Update job status
-            await supabase.jobs.update(id!, {
+            await apiClient.jobs.update(id!, {
                 status: "in_progress",
                 selectedFreelancerId: selectedApplication.freelancer_id,
             });
 
             // Update application status to selected
-            await supabase.applications.updateStatus(selectedApplication.id, "selected");
+            await apiClient.applications.updateStatus(selectedApplication.id, "selected");
 
             // Reject other applications
             const otherApplicationIds = applications
@@ -127,7 +127,7 @@ export default function JobApplicants() {
 
             // Update each other application to rejected status
             for (const appId of otherApplicationIds) {
-                await supabase.applications.updateStatus(appId, "rejected");
+                await apiClient.applications.updateStatus(appId, "rejected");
             }
 
             toast.success("Freelancer selected successfully!");
@@ -141,7 +141,7 @@ export default function JobApplicants() {
 
     const handleShortlist = async (applicationId: string) => {
         try {
-            await supabase.applications.updateStatus(applicationId, "shortlisted");
+            await apiClient.applications.updateStatus(applicationId, "shortlisted");
 
             toast.success("Applicant shortlisted");
             fetchApplications();
@@ -153,7 +153,7 @@ export default function JobApplicants() {
 
     const handleReject = async (applicationId: string) => {
         try {
-            await supabase.applications.updateStatus(applicationId, "rejected");
+            await apiClient.applications.updateStatus(applicationId, "rejected");
 
             toast.success("Applicant rejected");
             setShowRejectDialog(false);

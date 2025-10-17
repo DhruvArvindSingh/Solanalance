@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import {
     Dialog,
     DialogContent,
@@ -48,8 +48,8 @@ const RatingCriteria = ({
                     >
                         <Star
                             className={`w-8 h-8 ${star <= value
-                                    ? "fill-warning text-warning"
-                                    : "text-muted-foreground"
+                                ? "fill-warning text-warning"
+                                : "text-muted-foreground"
                                 }`}
                         />
                     </button>
@@ -98,7 +98,7 @@ export const RatingModal = ({
 
         try {
             // Insert rating
-            const { error: ratingError } = await supabase.from("ratings").insert({
+            const { error: ratingError } = await apiClient.from("ratings").insert({
                 project_id: projectId,
                 rater_id: user.id,
                 ratee_id: counterpartyId,
@@ -131,7 +131,7 @@ export const RatingModal = ({
             pointsChange += 20;
 
             // Update trust points for the rated user
-            const { data: currentTrust } = await supabase
+            const { data: currentTrust } = await apiClient
                 .from("trust_points")
                 .select("*")
                 .eq("user_id", counterpartyId)
@@ -143,7 +143,7 @@ export const RatingModal = ({
                 const newSuccessfulProjects = averageRating >= 3 ? currentTrust.successful_projects + 1 : currentTrust.successful_projects;
 
                 // Calculate new average rating
-                const { data: allRatings } = await supabase
+                const { data: allRatings } = await apiClient
                     .from("ratings")
                     .select("overall_rating")
                     .eq("ratee_id", counterpartyId);
@@ -159,7 +159,7 @@ export const RatingModal = ({
                 const newTier = calculateTier(newPoints, newCompletedProjects, successRate);
 
                 // Update trust points
-                await supabase
+                await apiClient
                     .from("trust_points")
                     .update({
                         total_points: newPoints,
@@ -173,7 +173,7 @@ export const RatingModal = ({
             }
 
             // Create notification
-            await supabase.from("notifications").insert({
+            await apiClient.from("notifications").insert({
                 user_id: counterpartyId,
                 title: "New Rating Received",
                 message: `You received a ${averageRating.toFixed(1)}-star rating for "${projectTitle}"`,

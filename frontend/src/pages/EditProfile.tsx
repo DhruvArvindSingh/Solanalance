@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,8 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Save, Plus, X } from "lucide-react";
+import { ArrowLeft, Save, Plus, X, Wallet, CheckCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 export default function EditProfile() {
     const { user } = useAuth();
@@ -24,8 +26,15 @@ export default function EditProfile() {
     const [skills, setSkills] = useState<string[]>([]);
     const [newSkill, setNewSkill] = useState("");
     const [avatarUrl, setAvatarUrl] = useState("");
+    const [walletAddress, setWalletAddress] = useState("");
+    const [manualWalletAddress, setManualWalletAddress] = useState("");
+    const [useManualWallet, setUseManualWallet] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+
+    const { connection } = useConnection();
+    const { publicKey, disconnect, connected } = useWallet();
+    const { setVisible } = useWalletModal();
 
     useEffect(() => {
         if (!user) {
@@ -36,11 +45,18 @@ export default function EditProfile() {
         fetchProfile();
     }, [user]);
 
+    // Monitor wallet connection status
+    useEffect(() => {
+        if (connected && publicKey) {
+            setWalletAddress(publicKey.toBase58());
+        }
+    }, [connected, publicKey]);
+
     const fetchProfile = async () => {
         if (!user) return;
 
         try {
-            const { data, error } = await supabase.profile.getById(user.id);
+            const { data, error } = await apiClient.profile.getById(user.id);
 
             if (error) throw new Error(error);
 
@@ -51,6 +67,9 @@ export default function EditProfile() {
                 setHourlyRate(data.hourly_rate || 0);
                 setSkills(data.skills || []);
                 setAvatarUrl(data.avatar_url || "");
+                const walletAddr = data.wallet_address || "";
+                setWalletAddress(walletAddr);
+                setManualWalletAddress(walletAddr);
             }
         } catch (error: any) {
             console.error("Error fetching profile:", error);
@@ -93,13 +112,29 @@ export default function EditProfile() {
         setSaving(true);
 
         try {
-            const { data, error } = await supabase.profile.update({
+            // Determine final wallet address based on method used
+            let finalWalletAddress = null;
+            if (useManualWallet) {
+                // Validate manual wallet address
+                if (manualWalletAddress.trim()) {
+                    if (!/^([1-9A-HJ-NP-Za-km-z]{32,44})$/.test(manualWalletAddress.trim())) {
+                        toast.error("Please enter a valid Solana wallet address");
+                        return;
+                    }
+                    finalWalletAddress = manualWalletAddress.trim();
+                }
+            } else if (walletAddress) {
+                finalWalletAddress = walletAddress;
+            }
+
+            const { data, error } = await apiClient.profile.update({
                 fullName,
                 bio: bio || null,
                 companyName: companyName || null,
                 hourlyRate: hourlyRate > 0 ? hourlyRate : null,
                 skills: skills,
                 avatarUrl: avatarUrl || null,
+                walletAddress: finalWalletAddress,
             });
 
             if (error) throw new Error(error);
@@ -241,6 +276,129 @@ export default function EditProfile() {
                                     value={hourlyRate || ""}
                                     onChange={(e) => setHourlyRate(parseFloat(e.target.value) || 0)}
                                 />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Wallet Address */}
+                    <Card className="glass border-white/10">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Wallet className="w-5 h-5" />
+                                Solana Wallet Address
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Wallet Address</Label>
+
+                                {/* Wallet Method Toggle */}
+                                <div className="flex gap-2 mb-4">
+                                    <Button
+                                        type="button"
+                                        variant={!useManualWallet ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => setUseManualWallet(false)}
+                                        className={!useManualWallet ? "bg-gradient-solana" : ""}
+                                    >
+                                        <Wallet className="w-4 h-4 mr-2" />
+                                        Connect Wallet
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={useManualWallet ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => setUseManualWallet(true)}
+                                        className={useManualWallet ? "bg-gradient-solana" : ""}
+                                    >
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        Enter Address
+                                    </Button>
+                                </div>
+
+                                <div className="p-4 border rounded-lg bg-muted/20">
+                                    {useManualWallet ? (
+                                        /* Manual Wallet Address Entry */
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 text-blue-600">
+                                                <CheckCircle className="w-4 h-4" />
+                                                <span className="text-sm font-medium">Enter Wallet Address</span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Enter your Solana wallet address manually. Changes will be saved when you update your profile.
+                                            </p>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="edit-manual-wallet" className="text-xs">Wallet Address</Label>
+                                                <Input
+                                                    id="edit-manual-wallet"
+                                                    type="text"
+                                                    placeholder="Enter your Solana wallet address (32-44 characters)"
+                                                    value={manualWalletAddress}
+                                                    onChange={(e) => setManualWalletAddress(e.target.value)}
+                                                    className="font-mono text-sm"
+                                                    maxLength={44}
+                                                />
+                                                {manualWalletAddress && (
+                                                    <div className="flex items-center gap-2">
+                                                        {/^([1-9A-HJ-NP-Za-km-z]{32,44})$/.test(manualWalletAddress) ? (
+                                                            <CheckCircle className="w-3 h-3 text-green-600" />
+                                                        ) : (
+                                                            <AlertCircle className="w-3 h-3 text-red-600" />
+                                                        )}
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {/^([1-9A-HJ-NP-Za-km-z]{32,44})$/.test(manualWalletAddress)
+                                                                ? "Valid Solana address"
+                                                                : "Invalid Solana address format"
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        /* Wallet Connection */
+                                        walletAddress ? (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2 text-green-600">
+                                                    <CheckCircle className="w-4 h-4" />
+                                                    <span className="text-sm font-medium">Wallet Connected</span>
+                                                </div>
+                                                <div className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded break-all">
+                                                    {walletAddress}
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setVisible(true)}
+                                                    className="text-xs"
+                                                >
+                                                    Change Wallet
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2 text-orange-600">
+                                                    <AlertCircle className="w-4 h-4" />
+                                                    <span className="text-sm font-medium">No Wallet Connected</span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Connect your Solana wallet for secure transactions and staking.
+                                                </p>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setVisible(true)}
+                                                    className="bg-gradient-solana text-white hover:bg-gradient-solana/90"
+                                                >
+                                                    <Wallet className="w-4 h-4 mr-2" />
+                                                    Select Wallet
+                                                </Button>
+                                            </div>
+                                        )
+                                    )}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

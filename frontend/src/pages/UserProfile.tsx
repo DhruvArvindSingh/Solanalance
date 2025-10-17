@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import { formatDistanceToNow } from "date-fns";
 
 interface Profile {
     id: string;
+    user_id: number;
     full_name: string;
     email: string;
     avatar_url: string | null;
@@ -33,6 +34,7 @@ interface Profile {
     skills: string[] | null;
     hourly_rate: number | null;
     company_name: string | null;
+    wallet_address: string | null;
     created_at: string;
 }
 
@@ -67,6 +69,7 @@ export default function UserProfile() {
     const navigate = useNavigate();
 
     const [profile, setProfile] = useState<Profile | null>(null);
+    console.log('Component render - profile state:', profile);
     const [trustPoints, setTrustPoints] = useState<TrustPoints | null>(null);
     const [ratings, setRatings] = useState<Rating[]>([]);
     const [userRole, setUserRole] = useState<string | null>(null);
@@ -87,13 +90,15 @@ export default function UserProfile() {
             setLoading(true);
 
             // Fetch profile (includes role and trust points)
-            const { data: profileData, error: profileError } = await supabase.profile.getById(id);
+            const { data: profileData, error: profileError } = await apiClient.profile.getById(id);
 
             if (profileError) throw new Error(profileError);
 
             if (profileData) {
+                console.log('Profile data received:', profileData);
                 setProfile({
                     id: profileData.id,
+                    user_id: profileData.user_id,
                     full_name: profileData.full_name,
                     email: profileData.email,
                     avatar_url: profileData.avatar_url,
@@ -101,7 +106,12 @@ export default function UserProfile() {
                     skills: profileData.skills,
                     hourly_rate: profileData.hourly_rate,
                     company_name: profileData.company_name,
+                    wallet_address: profileData.wallet_address,
                     created_at: profileData.created_at
+                });
+                console.log('Profile state set:', {
+                    user_id: profileData.user_id,
+                    wallet_address: profileData.wallet_address
                 });
 
                 setUserRole(profileData.role);
@@ -179,6 +189,21 @@ export default function UserProfile() {
                                             <Badge variant="outline" className="capitalize mb-3">
                                                 {userRole}
                                             </Badge>
+                                        )}
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="text-sm text-muted-foreground">User ID:</span>
+                                            <Badge variant="secondary" className="font-mono">
+                                                #{profile.user_id}
+                                            </Badge>
+                                        </div>
+                                        {console.log('Rendering profile:', { user_id: profile.user_id, wallet_address: profile.wallet_address })}
+                                        {profile.wallet_address && (
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span className="text-sm text-muted-foreground">Wallet:</span>
+                                                <Badge variant="outline" className="font-mono text-xs">
+                                                    {profile.wallet_address.slice(0, 8)}...{profile.wallet_address.slice(-8)}
+                                                </Badge>
+                                            </div>
                                         )}
                                     </div>
 

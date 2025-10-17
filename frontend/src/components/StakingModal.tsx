@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL, SystemProgram, Transaction } from "@solana/web3.js";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
     Dialog,
@@ -103,7 +103,7 @@ export const StakingModal = ({
             await connection.confirmTransaction(signature, "confirmed");
 
             // Create project and staking through backend API
-            const { data: stakingData, error: stakingError } = await supabase.staking.create({
+            const { data: stakingData, error: stakingError } = await apiClient.staking.create({
                 jobId,
                 freelancerId,
                 totalStaked: stakeAmount,

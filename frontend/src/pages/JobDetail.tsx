@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,7 +77,7 @@ export default function JobDetail() {
     const fetchJobDetails = async () => {
         try {
             // Fetch job (includes all related data)
-            const { data: jobData, error: jobError } = await supabase.jobs.getById(id!);
+            const { data: jobData, error: jobError } = await apiClient.jobs.getById(id!);
 
             if (jobError) throw new Error(jobError);
 
@@ -111,7 +111,7 @@ export default function JobDetail() {
 
                 // Check if current user has applied
                 if (user) {
-                    const { data: applicationData, error: appError } = await supabase.applications.checkApplication(id!);
+                    const { data: applicationData, error: appError } = await apiClient.applications.checkApplication(id!);
                     console.log("applicationData", applicationData);
                     console.log("appError", appError);
                     if (!appError && applicationData) {

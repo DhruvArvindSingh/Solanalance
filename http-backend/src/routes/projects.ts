@@ -35,7 +35,7 @@ router.get('/my-projects', authenticateToken, async (req, res) => {
             job: {
                 id: project.job.id,
                 title: project.job.title,
-                total_payment: project.job.totalPayment
+                total_payment: parseFloat(project.job.totalPayment.toString())
             }
         }));
 
@@ -105,7 +105,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
             reviewed_at: milestone.reviewedAt,
             reviewer_comments: milestone.reviewerComments,
             payment_released: milestone.paymentReleased,
-            payment_amount: milestone.paymentAmount,
+            payment_amount: parseFloat(milestone.paymentAmount.toString()),
             stage: {
                 name: milestone.stage.name,
                 description: milestone.stage.description
@@ -123,11 +123,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
             job: {
                 title: project.job.title,
                 description: project.job.description,
-                total_payment: project.job.totalPayment
+                total_payment: parseFloat(project.job.totalPayment.toString())
             },
             staking: {
-                total_staked: staking.totalStaked,
-                total_released: staking.totalReleased
+                total_staked: parseFloat(staking.totalStaked.toString()),
+                total_released: parseFloat(staking.totalReleased.toString())
             },
             milestones: transformedMilestones
         };

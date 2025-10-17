@@ -15,6 +15,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export const Navbar = () => {
   const { user, userRole, signOut } = useAuth();
+  console.log(user);
+  console.log(userRole);
+  console.log(signOut);
   const navigate = useNavigate();
 
   return (

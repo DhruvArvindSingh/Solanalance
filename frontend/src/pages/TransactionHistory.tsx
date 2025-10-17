@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,7 +68,7 @@ export default function TransactionHistory() {
         try {
             setLoading(true);
 
-            const { data, error } = await supabase.transactions.getMyTransactions();
+            const { data, error } = await apiClient.transactions.getMyTransactions();
 
             if (error) throw new Error(error);
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,21 +72,21 @@ export default function FreelancerDashboard() {
             setLoading(true);
 
             // Fetch applications
-            const { data: applicationsData, error: applicationsError } = await supabase.applications.getMyApplications();
+            const { data: applicationsData, error: applicationsError } = await apiClient.applications.getMyApplications();
 
             if (applicationsError) throw new Error(applicationsError);
 
             setApplications(applicationsData || []);
 
             // Fetch projects
-            const { data: projectsData, error: projectsError } = await supabase.projects.getMyProjects();
+            const { data: projectsData, error: projectsError } = await apiClient.projects.getMyProjects();
 
             if (projectsError) throw new Error(projectsError);
 
             setProjects(projectsData || []);
 
             // Fetch trust points from user profile
-            const { data: profileData, error: profileError } = await supabase.profile.getById(user.id);
+            const { data: profileData, error: profileError } = await apiClient.profile.getById(user.id);
 
             if (!profileError && profileData && profileData.trust_points) {
                 setTrustPoints({

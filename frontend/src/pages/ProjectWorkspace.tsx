@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL, SystemProgram, Transaction } from "@solana/web3.js";
 import { Navbar } from "@/components/Navbar";
@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RatingModal } from "@/components/RatingModal";
-import { ProjectMessages } from "@/components/ProjectMessages";
+import { useMessagingStore } from "@/stores/messagingStore";
 import {
     ArrowLeft,
     CheckCircle,
@@ -70,6 +70,7 @@ interface Project {
 export default function ProjectWorkspace() {
     const { id } = useParams<{ id: string }>();
     const { user, userRole } = useAuth();
+    const { sendMessage } = useMessagingStore();
     const navigate = useNavigate();
     const { connection } = useConnection();
     const { publicKey, sendTransaction } = useWallet();
@@ -109,30 +110,9 @@ export default function ProjectWorkspace() {
             setLoading(true);
 
             // Fetch project with job and staking info
-            const { data: projectData, error: projectError } = await supabase
-                .from("projects")
-                .select(`
-          id,
-          job_id,
-          recruiter_id,
-          freelancer_id,
-          current_stage,
-          status,
-          started_at,
-          jobs (
-            title,
-            description,
-            total_payment
-          ),
-          staking (
-            total_staked,
-            total_released
-          )
-        `)
-                .eq("id", id)
-                .single();
+            const { data: projectData, error: projectError } = await apiClient.projects.getById(id);
 
-            if (projectError) throw projectError;
+            if (projectError) throw new Error(projectError);
 
             // Check if user has access to this project
             if (
@@ -144,68 +124,32 @@ export default function ProjectWorkspace() {
                 return;
             }
 
-            setProject(projectData as any);
+            setProject(projectData);
+            setMilestones(projectData.milestones || []);
 
-            // Fetch milestones with stage info
-            const { data: milestonesData, error: milestonesError } = await supabase
-                .from("milestones")
-                .select(`
-          id,
-          stage_number,
-          status,
-          submission_description,
-          submission_files,
-          submission_links,
-          submitted_at,
-          reviewed_at,
-          reviewer_comments,
-          payment_released,
-          payment_amount,
-          job_stages!milestones_stage_id_fkey (
-            name,
-            description
-          )
-        `)
-                .eq("project_id", id)
-                .order("stage_number");
-
-            if (milestonesError) throw milestonesError;
-
-            const transformedMilestones = (milestonesData || []).map((m: any) => ({
-                ...m,
-                stage: {
-                    name: m.job_stages?.name || "Unknown Stage",
-                    description: m.job_stages?.description,
-                },
-            }));
-
-            setMilestones(transformedMilestones);
-
-            // Check if user has already rated this project
-            const { data: existingRating } = await supabase
-                .from("ratings")
-                .select("id")
-                .eq("project_id", id)
-                .eq("rater_id", user.id)
-                .single();
-
-            setHasRated(!!existingRating);
+            // TODO: Add rating check and counterparty profile fetch when API endpoints are available
+            setHasRated(false);
 
             // Get counterparty info
             const counterpartyUserId = projectData.recruiter_id === user.id
                 ? projectData.freelancer_id
                 : projectData.recruiter_id;
 
-            const { data: counterpartyProfile } = await supabase
-                .from("profiles")
-                .select("full_name")
-                .eq("id", counterpartyUserId)
-                .single();
+            try {
+                const { data: counterpartyProfile, error: profileError } = await apiClient.profile.getById(counterpartyUserId);
+                if (profileError) throw new Error(profileError);
 
-            setCounterpartyInfo({
-                id: counterpartyUserId,
-                name: counterpartyProfile?.full_name || "Unknown",
-            });
+                setCounterpartyInfo({
+                    id: counterpartyUserId,
+                    name: counterpartyProfile.full_name || "Unknown User",
+                });
+            } catch (error) {
+                console.error("Error fetching counterparty profile:", error);
+                setCounterpartyInfo({
+                    id: counterpartyUserId,
+                    name: "Unknown User",
+                });
+            }
         } catch (error: any) {
             console.error("Error fetching project:", error);
             toast.error("Failed to load project");
@@ -228,24 +172,12 @@ export default function ProjectWorkspace() {
                 .map((l) => l.trim())
                 .filter((l) => l.length > 0);
 
-            await supabase
-                .from("milestones")
-                .update({
-                    status: "submitted",
-                    submission_description: submissionDescription,
-                    submission_links: links.length > 0 ? links : null,
-                    submitted_at: new Date().toISOString(),
-                })
-                .eq("id", milestoneId);
-
-            // Create notification for recruiter
-            await supabase.from("notifications").insert({
-                user_id: project?.recruiter_id,
-                title: "Milestone Submitted",
-                message: `A milestone has been submitted for "${project?.job.title}"`,
-                type: "milestone",
-                related_id: milestoneId,
+            const { error } = await apiClient.projects.submitMilestone(milestoneId, {
+                submission_description: submissionDescription,
+                submission_links: links.length > 0 ? links : null,
             });
+
+            if (error) throw new Error(error);
 
             toast.success("Milestone submitted for review");
             setSubmissionDescription("");
@@ -279,13 +211,10 @@ export default function ProjectWorkspace() {
             }
 
             // Get freelancer wallet address
-            const { data: walletData } = await supabase
-                .from("user_wallets")
-                .select("wallet_address")
-                .eq("user_id", project.freelancer_id)
-                .single();
+            const { data: freelancerProfile, error: profileError } = await apiClient.profile.getById(project.freelancer_id);
+            if (profileError) throw new Error(profileError);
 
-            if (!walletData?.wallet_address) {
+            if (!freelancerProfile?.wallet_address) {
                 toast.error("Freelancer wallet not found");
                 setIsReviewing(false);
                 setReviewingMilestoneId(null);
@@ -304,74 +233,14 @@ export default function ProjectWorkspace() {
             const signature = await sendTransaction(transaction, connection);
             await connection.confirmTransaction(signature, "confirmed");
 
-            // Update milestone
-            await supabase
-                .from("milestones")
-                .update({
-                    status: "approved",
-                    payment_released: true,
-                    reviewed_at: new Date().toISOString(),
-                    reviewer_comments: reviewComments || null,
-                })
-                .eq("id", milestone.id);
-
-            // Update staking record
-            await supabase
-                .from("staking")
-                .update({
-                    total_released:
-                        project.staking.total_released + milestone.payment_amount,
-                })
-                .eq("project_id", project.id);
-
-            // Record transaction
-            await supabase.from("transactions").insert({
-                project_id: project.id,
-                milestone_id: milestone.id,
-                from_user_id: project.recruiter_id,
-                to_user_id: project.freelancer_id,
-                amount: milestone.payment_amount,
-                type: "payment",
-                wallet_signature: signature,
-                wallet_from: publicKey.toBase58(),
-                wallet_to: walletData.wallet_address,
-                status: "confirmed",
+            // Review milestone
+            const { error: reviewError } = await apiClient.projects.reviewMilestone(milestone.id, {
+                status: 'approved',
+                comments: reviewComments || null,
+                transaction_signature: signature,
             });
 
-            // Update project stage if needed
-            if (milestone.stage_number < 3) {
-                await supabase
-                    .from("projects")
-                    .update({ current_stage: milestone.stage_number + 1 })
-                    .eq("id", project.id);
-
-                // Set next milestone to in_progress
-                await supabase
-                    .from("milestones")
-                    .update({ status: "in_progress" })
-                    .eq("project_id", project.id)
-                    .eq("stage_number", milestone.stage_number + 1);
-            } else {
-                // Project completed
-                await supabase
-                    .from("projects")
-                    .update({ status: "completed", completed_at: new Date().toISOString() })
-                    .eq("id", project.id);
-
-                await supabase
-                    .from("jobs")
-                    .update({ status: "completed" })
-                    .eq("id", project.job_id);
-            }
-
-            // Create notification for freelancer
-            await supabase.from("notifications").insert({
-                user_id: project.freelancer_id,
-                title: "Payment Released",
-                message: `You received ${milestone.payment_amount.toFixed(2)} SOL for completing a milestone`,
-                type: "payment",
-                related_id: milestone.id,
-            });
+            if (reviewError) throw new Error(reviewError);
 
             toast.success("Milestone approved! Payment sent to freelancer.");
             setReviewComments("");
@@ -399,23 +268,12 @@ export default function ProjectWorkspace() {
         }
 
         try {
-            await supabase
-                .from("milestones")
-                .update({
-                    status: "revision_requested",
-                    reviewer_comments: reviewComments,
-                    reviewed_at: new Date().toISOString(),
-                })
-                .eq("id", milestoneId);
-
-            // Create notification
-            await supabase.from("notifications").insert({
-                user_id: project?.freelancer_id,
-                title: "Revision Requested",
-                message: `The recruiter has requested revisions for a milestone in "${project?.job.title}"`,
-                type: "milestone",
-                related_id: milestoneId,
+            const { error } = await apiClient.projects.reviewMilestone(milestoneId, {
+                status: 'revision_requested',
+                comments: reviewComments,
             });
+
+            if (error) throw new Error(error);
 
             toast.success("Revision requested");
             setReviewComments("");
@@ -574,6 +432,18 @@ export default function ProjectWorkspace() {
                                         </Badge>
                                     </div>
                                 </CardHeader>
+                                {milestone.status === "in_progress" && !isRecruiter && (
+                                    <CardContent>
+                                        <Button
+                                            onClick={() => {
+                                                sendMessage(project.id, "Hi!!!", project.recruiter_id);
+                                                toast.success("Message sent to recruiter!");
+                                            }}
+                                        >
+                                            Send recruiter 'Hi!!!'
+                                        </Button>
+                                    </CardContent>
+                                )}
                                 <CardContent className="space-y-4">
                                     {/* Payment Info */}
                                     <div className="flex items-center justify-between p-3 bg-gradient-card rounded-lg">
@@ -876,14 +746,6 @@ export default function ProjectWorkspace() {
                             </CardContent>
                         </Card>
 
-                        {/* Messages */}
-                        {counterpartyInfo && (
-                            <ProjectMessages
-                                projectId={project.id}
-                                recipientId={counterpartyInfo.id}
-                                recipientName={counterpartyInfo.name}
-                            />
-                        )}
                     </div>
 
                     {/* Project Completed - Rating CTA */}
@@ -938,4 +800,3 @@ export default function ProjectWorkspace() {
         </div>
     );
 }
-

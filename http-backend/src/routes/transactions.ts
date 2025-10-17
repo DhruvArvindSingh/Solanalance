@@ -31,7 +31,7 @@ router.get('/my-transactions', authenticateToken, async (req, res) => {
 
         const transformedTransactions = transactions.map(transaction => ({
             id: transaction.id,
-            amount: transaction.amount,
+            amount: parseFloat(transaction.amount.toString()),
             type: transaction.type,
             wallet_signature: transaction.walletSignature,
             wallet_from: transaction.walletFrom,
@@ -92,7 +92,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
         const response = {
             id: transaction.id,
-            amount: transaction.amount,
+            amount: parseFloat(transaction.amount.toString()),
             type: transaction.type,
             wallet_signature: transaction.walletSignature,
             wallet_from: transaction.walletFrom,

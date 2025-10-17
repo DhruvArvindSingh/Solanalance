@@ -12,7 +12,8 @@ router.get('/:id', async (req, res) => {
             where: { id },
             include: {
                 userRoles: true,
-                trustPoints: true
+                trustPoints: true,
+                userWallets: true
             }
         });
 
@@ -68,6 +69,7 @@ router.get('/:id', async (req, res) => {
 
         const response = {
             id: profile.id,
+            user_id: profile.userId,
             full_name: profile.fullName,
             email: profile.email,
             avatar_url: profile.avatarUrl,
@@ -78,6 +80,7 @@ router.get('/:id', async (req, res) => {
             created_at: profile.createdAt,
             role: profile.userRoles[0]?.role || null,
             trust_points: profile.trustPoints[0] || null,
+            wallet_address: profile.userWallets[0]?.walletAddress || null,
             ratings: transformedRatings
         };
 
@@ -91,7 +94,49 @@ router.get('/:id', async (req, res) => {
 // Update profile
 router.put('/update', authenticateToken, async (req, res) => {
     try {
-        const { fullName, bio, companyName, hourlyRate, skills, avatarUrl } = req.body;
+        const { fullName, bio, companyName, hourlyRate, skills, avatarUrl, walletAddress } = req.body;
+
+        // Handle wallet address update if provided
+        if (walletAddress !== undefined) {
+            // Validate wallet address format
+            if (!/^([1-9A-HJ-NP-Za-km-z]{32,44})$/.test(walletAddress)) {
+                return res.status(400).json({ error: 'Invalid Solana wallet address format' });
+            }
+
+            // Check if wallet address is already registered to another user
+            const existingWallet = await req.prisma.userWallet.findFirst({
+                where: {
+                    walletAddress,
+                    userId: { not: req.user!.id }
+                }
+            });
+
+            if (existingWallet) {
+                return res.status(400).json({ error: 'Wallet address is already registered to another user' });
+            }
+
+            // First check if user already has a wallet record
+            const currentWallet = await req.prisma.userWallet.findFirst({
+                where: { userId: req.user!.id }
+            });
+
+            if (currentWallet) {
+                // Update existing wallet
+                await req.prisma.userWallet.update({
+                    where: { id: currentWallet.id },
+                    data: { walletAddress, updatedAt: new Date() }
+                });
+            } else {
+                // Create new wallet record
+                await req.prisma.userWallet.create({
+                    data: {
+                        userId: req.user!.id,
+                        walletAddress,
+                        isVerified: false
+                    }
+                });
+            }
+        }
 
         const updatedProfile = await req.prisma.profile.update({
             where: { id: req.user!.id },
@@ -105,16 +150,23 @@ router.put('/update', authenticateToken, async (req, res) => {
             }
         });
 
+        // Get the updated wallet information
+        const userWallet = await req.prisma.userWallet.findFirst({
+            where: { userId: req.user!.id }
+        });
+
         res.json({
             message: 'Profile updated successfully',
             profile: {
                 id: updatedProfile.id,
+                user_id: updatedProfile.userId,
                 full_name: updatedProfile.fullName,
                 bio: updatedProfile.bio,
                 company_name: updatedProfile.companyName,
                 hourly_rate: updatedProfile.hourlyRate,
                 skills: updatedProfile.skills,
-                avatar_url: updatedProfile.avatarUrl
+                avatar_url: updatedProfile.avatarUrl,
+                wallet_address: userWallet?.walletAddress || null
             }
         });
     } catch (error) {

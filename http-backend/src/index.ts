@@ -14,6 +14,7 @@ import stakingRoutes from './routes/staking';
 import ratingRoutes from './routes/ratings';
 import messageRoutes from './routes/messages';
 import notificationRoutes from './routes/notifications';
+import conversationRoutes from './routes/conversations';
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use('/api/staking', stakingRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/conversations', conversationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

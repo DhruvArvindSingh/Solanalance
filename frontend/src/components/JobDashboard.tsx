@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
@@ -73,7 +73,7 @@ export const JobDashboard = ({ showHeader = true }: JobDashboardProps) => {
       setLoading(true);
 
       // Fetch jobs using our API client
-      const { data, error } = await supabase.jobs.getAll({
+      const { data, error } = await apiClient.jobs.getAll({
         status: "open",
         limit: 100 // Fetch more jobs for better filtering
       });

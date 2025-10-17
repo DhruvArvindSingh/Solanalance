@@ -10,7 +10,7 @@ import { JobBasicInfo } from "@/components/job-creation/JobBasicInfo";
 import { JobSkillsRequirements } from "@/components/job-creation/JobSkillsRequirements";
 import { JobPaymentStructure } from "@/components/job-creation/JobPaymentStructure";
 import { JobReview } from "@/components/job-creation/JobReview";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/integrations/apiClient/client";
 import { toast } from "sonner";
 
 export type JobFormData = {
@@ -131,7 +131,7 @@ export default function CreateJob() {
                 ]
             };
 
-            const { data, error } = await supabase.jobs.create(jobData);
+            const { data, error } = await apiClient.jobs.create(jobData);
 
             if (error) throw new Error(error);
 

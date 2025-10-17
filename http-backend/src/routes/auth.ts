@@ -9,10 +9,15 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 // Register
 router.post('/register', async (req, res) => {
     try {
-        const { email, password, fullName, role } = req.body;
+        const { email, password, fullName, role, walletAddress } = req.body;
 
-        if (!email || !password || !fullName || !role) {
-            return res.status(400).json({ error: 'All fields are required' });
+        if (!email || !password || !fullName || !role || !walletAddress) {
+            return res.status(400).json({ error: 'All fields including wallet address are required' });
+        }
+
+        // Validate wallet address format (basic Solana address validation)
+        if (!/^([1-9A-HJ-NP-Za-km-z]{32,44})$/.test(walletAddress)) {
+            return res.status(400).json({ error: 'Invalid Solana wallet address format' });
         }
 
         // Check if user exists
@@ -24,10 +29,19 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'User already exists' });
         }
 
+        // Check if wallet address is already registered
+        const existingWallet = await req.prisma.userWallet.findFirst({
+            where: { walletAddress }
+        });
+
+        if (existingWallet) {
+            return res.status(400).json({ error: 'Wallet address is already registered' });
+        }
+
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create user profile
+        // Create user profile with unique userId
         const user = await req.prisma.profile.create({
             data: {
                 id: generateUUID(),
@@ -46,6 +60,15 @@ router.post('/register', async (req, res) => {
             }
         });
 
+        // Create user wallet
+        await req.prisma.userWallet.create({
+            data: {
+                userId: user.id,
+                walletAddress,
+                isVerified: false // Wallet verification can be implemented later
+            }
+        });
+
         // Create initial trust points
         await req.prisma.trustPoint.create({
             data: {
@@ -58,15 +81,17 @@ router.post('/register', async (req, res) => {
         });
 
         // Generate JWT
-        const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ userId: user.id, role }, JWT_SECRET, { expiresIn: '7d' });
 
         res.status(201).json({
-            message: 'User created successfully',
+            message: 'User registered successfully',
             token,
             user: {
                 id: user.id,
+                userId: user.userId, // Include the unique numeric ID
                 email: user.email,
                 fullName: user.fullName,
+                walletAddress,
                 role
             }
         });
@@ -102,7 +127,8 @@ router.post('/login', async (req, res) => {
         // const isValidPassword = await bcrypt.compare(password, user.hashedPassword);
 
         // Generate JWT
-        const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+        const role = user.userRoles[0]?.role || 'freelancer';
+        const token = jwt.sign({ userId: user.id, role }, JWT_SECRET, { expiresIn: '7d' });
 
         res.json({
             message: 'Login successful',
@@ -111,7 +137,7 @@ router.post('/login', async (req, res) => {
                 id: user.id,
                 email: user.email,
                 fullName: user.fullName,
-                role: user.userRoles[0]?.role || 'freelancer'
+                role
             }
         });
     } catch (error) {

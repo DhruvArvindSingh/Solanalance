@@ -1,73 +1,194 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { authenticateToken, requireRole } from '../middleware/auth';
+import multer from 'multer';
+import { uploadFileToS3 } from '../utils/s3Upload';
 
 const router = express.Router();
 
-// Create application
-router.post('/', authenticateToken, requireRole('freelancer'), async (req, res) => {
-    try {
-        const {
-            jobId,
-            coverLetter,
-            estimatedCompletionDays,
-            portfolioUrls
-        } = req.body;
-
-        // Check if job exists and is open
-        const job = await req.prisma.job.findUnique({
-            where: { id: jobId }
-        });
-
-        if (!job) {
-            return res.status(404).json({ error: 'Job not found' });
+// Configure multer for memory storage
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10 MB
+    },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only PDF files are allowed'));
         }
-
-        if (job.status !== 'open') {
-            return res.status(400).json({ error: 'Job is not accepting applications' });
-        }
-
-        // Check if user already applied
-        const existingApplication = await req.prisma.application.findFirst({
-            where: {
-                jobId,
-                freelancerId: req.user!.id
-            }
-        });
-
-        if (existingApplication) {
-            return res.status(400).json({ error: 'Already applied to this job' });
-        }
-
-        const application = await req.prisma.application.create({
-            data: {
-                jobId,
-                freelancerId: req.user!.id,
-                coverLetter,
-                estimatedCompletionDays: parseInt(estimatedCompletionDays),
-                portfolioUrls: portfolioUrls || []
-            }
-        });
-
-        // Create notification for recruiter
-        await req.prisma.notification.create({
-            data: {
-                userId: job.recruiterId,
-                title: 'New Job Application',
-                message: `Someone applied to your job "${job.title}"`,
-                type: 'application',
-                relatedId: application.id
-            }
-        });
-
-        res.status(201).json({
-            message: 'Application submitted successfully',
-            applicationId: application.id
-        });
-    } catch (error) {
-        console.error('Create application error:', error);
-        res.status(500).json({ error: 'Failed to create application' });
     }
 });
+
+// Create application with file uploads
+router.post('/',
+    authenticateToken,
+    requireRole('freelancer'),
+    upload.fields([
+        { name: 'resume', maxCount: 1 },
+        { name: 'coverLetter', maxCount: 1 }
+    ]),
+    async (req: any, res) => {
+        try {
+            const {
+                jobId,
+                coverLetterText,
+                estimatedCompletionDays,
+                portfolioUrls
+            } = req.body;
+
+            const freelancerId = req.user?.id;
+            const files = req.files as { [key: string]: Express.Multer.File[] } || {};
+            const resumeFile = files['resume']?.[0];
+            const coverLetterFile = files['coverLetter']?.[0];
+
+            // Check if job exists and is open
+            const job = await req.prisma.job.findUnique({
+                where: { id: jobId }
+            });
+
+            if (!job) {
+                return res.status(404).json({ error: 'Job not found' });
+            }
+
+            if (job.status !== 'open') {
+                return res.status(400).json({ error: 'Job is not accepting applications' });
+            }
+
+            // Check if user already applied
+            const existingApplication = await req.prisma.application.findFirst({
+                where: {
+                    jobId,
+                    freelancerId
+                }
+            });
+
+            if (existingApplication) {
+                return res.status(400).json({ error: 'You have already applied for this job' });
+            }
+
+            let resumeFileUrl = null;
+            let coverLetterFileUrl = null;
+
+            // Upload resume if provided
+            if (resumeFile) {
+                try {
+                    resumeFileUrl = await uploadFileToS3({
+                        userId: freelancerId,
+                        jobId,
+                        fileType: 'resume',
+                        file: resumeFile
+                    });
+                } catch (error) {
+                    return res.status(400).json({ error: `Failed to upload resume: ${(error as Error).message}` });
+                }
+            }
+
+            // Upload cover letter if provided
+            if (coverLetterFile) {
+                try {
+                    coverLetterFileUrl = await uploadFileToS3({
+                        userId: freelancerId,
+                        jobId,
+                        fileType: 'cover_letter',
+                        file: coverLetterFile
+                    });
+                } catch (error) {
+                    return res.status(400).json({ error: `Failed to upload cover letter: ${(error as Error).message}` });
+                }
+            }
+
+            // Create application
+            const application = await req.prisma.application.create({
+                data: {
+                    jobId,
+                    freelancerId,
+                    coverLetter: coverLetterText || null,
+                    coverLetterFileUrl,
+                    resumeFileUrl,
+                    estimatedCompletionDays: parseInt(estimatedCompletionDays),
+                    portfolioUrls: portfolioUrls ? JSON.parse(portfolioUrls) : []
+                },
+                include: {
+                    job: true,
+                    freelancer: true
+                }
+            });
+
+            // Create notification for recruiter
+            await req.prisma.notification.create({
+                data: {
+                    userId: job.recruiterId,
+                    title: 'New Job Application',
+                    message: `Someone applied to your job "${job.title}"`,
+                    type: 'application',
+                    relatedId: application.id
+                }
+            });
+
+            // Auto-create project and initial conversation when freelancer is selected
+            if (application.status === 'selected') {
+                // Check if project already exists
+                const existingProject = await req.prisma.project.findFirst({
+                    where: {
+                        jobId: application.jobId,
+                        freelancerId: application.freelancerId
+                    }
+                });
+
+                if (!existingProject) {
+                    // Create project
+                    const project = await req.prisma.project.create({
+                        data: {
+                            jobId: application.jobId,
+                            recruiterId: application.job.recruiterId,
+                            freelancerId: application.freelancerId,
+                            status: 'active'
+                        }
+                    });
+
+                    // Create initial system message to start the conversation
+                    await req.prisma.message.create({
+                        data: {
+                            projectId: project.id,
+                            senderId: application.job.recruiterId,
+                            content: `Welcome to the project: ${application.job.title}. Looking forward to working together! 🚀`,
+                            messageType: 'system',
+                            isRead: false
+                        }
+                    });
+
+                    // Create notification for project creation
+                    await req.prisma.notification.create({
+                        data: {
+                            userId: application.freelancerId,
+                            title: 'Project Started',
+                            message: `Your project "${application.job.title}" has been created. You can now communicate with the recruiter.`,
+                            type: 'project_started',
+                            relatedId: project.id
+                        }
+                    });
+                }
+            }
+
+            res.status(201).json({
+                message: 'Application submitted successfully',
+                application: {
+                    id: application.id,
+                    jobId: application.jobId,
+                    status: application.status,
+                    resumeFileUrl: application.resumeFileUrl,
+                    coverLetterFileUrl: application.coverLetterFileUrl,
+                    createdAt: application.createdAt
+                }
+            });
+
+        } catch (error) {
+            console.error('Error creating application:', error);
+            res.status(500).json({ error: 'Failed to submit application' });
+        }
+    }
+);
 
 // Get user's applications
 router.get('/my-applications', authenticateToken, requireRole('freelancer'), async (req, res) => {
@@ -170,6 +291,51 @@ router.put('/:id/status', authenticateToken, requireRole('recruiter'), async (re
                     relatedId: application.id
                 }
             });
+        }
+
+        // Auto-create project and initial conversation when freelancer is selected
+        if (status === 'selected') {
+            // Check if project already exists
+            const existingProject = await req.prisma.project.findFirst({
+                where: {
+                    jobId: application.jobId,
+                    freelancerId: application.freelancerId
+                }
+            });
+
+            if (!existingProject) {
+                // Create project
+                const project = await req.prisma.project.create({
+                    data: {
+                        jobId: application.jobId,
+                        recruiterId: application.job.recruiterId,
+                        freelancerId: application.freelancerId,
+                        status: 'active'
+                    }
+                });
+
+                // Create initial system message to start the conversation
+                await req.prisma.message.create({
+                    data: {
+                        projectId: project.id,
+                        senderId: application.job.recruiterId,
+                        content: `Welcome to the project: ${application.job.title}. Looking forward to working together! 🚀`,
+                        messageType: 'system',
+                        isRead: false
+                    }
+                });
+
+                // Create notification for project creation
+                await req.prisma.notification.create({
+                    data: {
+                        userId: application.freelancerId,
+                        title: 'Project Started',
+                        message: `Your project "${application.job.title}" has been created. You can now communicate with the recruiter.`,
+                        type: 'project_started',
+                        relatedId: project.id
+                    }
+                });
+            }
         }
 
         res.json({ message: 'Application status updated successfully' });
