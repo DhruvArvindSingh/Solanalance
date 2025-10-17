@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export const Navbar = () => {
   const { user, userRole, signOut } = useAuth();
@@ -65,8 +65,9 @@ export const Navbar = () => {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                       <Avatar>
+                        <AvatarImage src={user.avatarUrl || undefined} />
                         <AvatarFallback className="bg-gradient-solana text-background">
-                          {user.email?.charAt(0).toUpperCase()}
+                          {(user.fullName?.charAt(0) || user.email?.charAt(0) || "?").toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
@@ -93,8 +94,9 @@ export const Navbar = () => {
                       className="cursor-pointer"
                     >
                       <Avatar className="w-4 h-4 mr-2">
+                        <AvatarImage src={user.avatarUrl || undefined} />
                         <AvatarFallback className="text-xs">
-                          {user.email?.charAt(0).toUpperCase()}
+                          {(user.fullName?.charAt(0) || user.email?.charAt(0) || "?").toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       Profile

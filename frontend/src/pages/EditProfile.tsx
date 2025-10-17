@@ -10,13 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Save, Plus, X, Wallet, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, Save, Plus, X, Wallet, CheckCircle, AlertCircle, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 export default function EditProfile() {
-    const { user } = useAuth();
+    const { user, refreshAuth } = useAuth();
     const navigate = useNavigate();
 
     const [fullName, setFullName] = useState("");
@@ -31,6 +31,9 @@ export default function EditProfile() {
     const [useManualWallet, setUseManualWallet] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string>("");
+    const [uploadingProfilePic, setUploadingProfilePic] = useState(false);
 
     const { connection } = useConnection();
     const { publicKey, disconnect, connected } = useWallet();
@@ -94,6 +97,61 @@ export default function EditProfile() {
         setSkills(skills.filter((_, i) => i !== index));
     };
 
+    const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate file size (5 MB)
+        const MAX_SIZE = 5 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+            toast.error("File size must be less than 5 MB");
+            return;
+        }
+
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            toast.error("Only JPEG, PNG, GIF, and WebP images are allowed");
+            return;
+        }
+
+        setProfilePictureFile(file);
+        // Create preview URL
+        const preview = URL.createObjectURL(file);
+        setPreviewUrl(preview);
+    };
+
+    const handleUploadProfilePicture = async () => {
+        if (!profilePictureFile) {
+            toast.error("No file selected");
+            return;
+        }
+
+        setUploadingProfilePic(true);
+        try {
+            const { data, error } = await apiClient.profile.uploadProfilePicture(profilePictureFile);
+
+            if (error) throw new Error(error);
+
+            setAvatarUrl(data.avatar_url);
+            setProfilePictureFile(null);
+            setPreviewUrl("");
+            // Refresh auth context to update navbar profile picture
+            await refreshAuth();
+            toast.success("Profile picture uploaded successfully!");
+        } catch (error: any) {
+            console.error("Error uploading profile picture:", error);
+            toast.error(error.message || "Failed to upload profile picture");
+        } finally {
+            setUploadingProfilePic(false);
+        }
+    };
+
+    const handleRemoveProfilePicture = () => {
+        setProfilePictureFile(null);
+        setPreviewUrl("");
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -139,6 +197,8 @@ export default function EditProfile() {
 
             if (error) throw new Error(error);
 
+            // Refresh auth context to update navbar with latest profile data
+            await refreshAuth();
             toast.success("Profile updated successfully!");
             navigate(`/profile/${user.id}`);
         } catch (error: any) {
@@ -190,24 +250,91 @@ export default function EditProfile() {
                         <CardContent className="space-y-4">
                             <div className="flex items-center space-x-6">
                                 <Avatar className="w-24 h-24 border-4 border-white/10">
-                                    <AvatarImage src={avatarUrl || undefined} />
+                                    <AvatarImage src={previewUrl || avatarUrl || undefined} />
                                     <AvatarFallback className="bg-gradient-solana text-background text-3xl font-bold">
-                                        {fullName.charAt(0) || "?"}
+                                        {(fullName.charAt(0) || "?").toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
-                                <div className="flex-1">
-                                    <Label htmlFor="avatar">Avatar URL</Label>
-                                    <Input
-                                        id="avatar"
-                                        type="url"
-                                        placeholder="https://example.com/avatar.jpg"
-                                        value={avatarUrl}
-                                        onChange={(e) => setAvatarUrl(e.target.value)}
-                                        className="mt-2"
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Provide a URL to your profile picture
-                                    </p>
+                                <div className="flex-1 space-y-3">
+                                    {/* File Upload Section */}
+                                    <div>
+                                        <Label htmlFor="profilePicture" className="text-sm font-medium mb-2 block">
+                                            Upload Profile Picture
+                                        </Label>
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                id="profilePicture"
+                                                type="file"
+                                                accept="image/jpeg,image/png,image/gif,image/webp"
+                                                onChange={handleProfilePictureChange}
+                                                className="cursor-pointer"
+                                            />
+                                            {profilePictureFile && (
+                                                <>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        onClick={handleUploadProfilePicture}
+                                                        disabled={uploadingProfilePic}
+                                                        className="bg-gradient-solana"
+                                                    >
+                                                        {uploadingProfilePic ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                                Uploading...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Upload className="w-4 h-4 mr-2" />
+                                                                Upload
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={handleRemoveProfilePicture}
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </Button>
+                                                </>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {profilePictureFile
+                                                ? `Selected: ${profilePictureFile.name} (${(profilePictureFile.size / 1024 / 1024).toFixed(2)} MB)`
+                                                : "Max 5 MB. Supported: JPEG, PNG, GIF, WebP"
+                                            }
+                                        </p>
+                                    </div>
+
+                                    {/* Or Section */}
+                                    <div className="relative">
+                                        <div className="absolute inset-0 flex items-center">
+                                            <div className="w-full border-t border-muted"></div>
+                                        </div>
+                                        <div className="relative flex justify-center text-xs uppercase">
+                                            <span className="px-2 bg-background text-muted-foreground">Or</span>
+                                        </div>
+                                    </div>
+
+                                    {/* URL Input Section */}
+                                    <div>
+                                        <Label htmlFor="avatar" className="text-sm font-medium mb-2 block">
+                                            Avatar URL
+                                        </Label>
+                                        <Input
+                                            id="avatar"
+                                            type="url"
+                                            placeholder="https://example.com/avatar.jpg"
+                                            value={avatarUrl}
+                                            onChange={(e) => setAvatarUrl(e.target.value)}
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Or provide a URL to your profile picture
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>

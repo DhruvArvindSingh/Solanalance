@@ -1,7 +1,57 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth';
+import multer, { FileFilterCallback } from 'multer';
+import { Request } from 'express';
+import { uploadProfilePictureToS3, getProfilePictureFromS3 } from '../utils/s3Upload';
 
 const router = express.Router();
+
+// Configure multer for profile picture uploads
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5 MB
+    },
+    fileFilter: (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+        const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (allowedMimes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'));
+        }
+    }
+});
+
+// Upload profile picture
+router.post('/picture/upload', authenticateToken, upload.single('profilePicture'), async (req: any, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file provided' });
+        }
+
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        // Upload to S3
+        const profilePicUrl = await uploadProfilePictureToS3(userId, req.file);
+
+        // Update profile with new avatar URL
+        const updatedProfile = await req.prisma.profile.update({
+            where: { id: userId },
+            data: { avatarUrl: profilePicUrl }
+        });
+
+        res.json({
+            message: 'Profile picture uploaded successfully',
+            avatar_url: updatedProfile.avatarUrl
+        });
+    } catch (error: any) {
+        console.error('Profile picture upload error:', error);
+        res.status(500).json({ error: error.message || 'Failed to upload profile picture' });
+    }
+});
 
 // Get profile by ID
 router.get('/:id', async (req, res) => {
@@ -67,12 +117,26 @@ router.get('/:id', async (req, res) => {
             }
         }));
 
+        // Check S3 for profile picture if avatarUrl is not set
+        let avatarUrl = profile.avatarUrl;
+        if (!avatarUrl) {
+            const s3ProfilePic = await getProfilePictureFromS3(id);
+            if (s3ProfilePic) {
+                avatarUrl = s3ProfilePic;
+                // Optionally update the profile with the S3 URL
+                await req.prisma.profile.update({
+                    where: { id },
+                    data: { avatarUrl: s3ProfilePic }
+                }).catch(err => console.error('Error updating profile with S3 URL:', err));
+            }
+        }
+
         const response = {
             id: profile.id,
             user_id: profile.userId,
             full_name: profile.fullName,
             email: profile.email,
-            avatar_url: profile.avatarUrl,
+            avatar_url: avatarUrl,
             bio: profile.bio,
             skills: profile.skills,
             hourly_rate: profile.hourlyRate,

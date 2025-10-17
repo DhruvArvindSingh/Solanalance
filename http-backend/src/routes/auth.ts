@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authenticateToken } from '../middleware/auth';
+import { getProfilePictureFromS3 } from '../utils/s3Upload';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -130,6 +131,15 @@ router.post('/login', async (req, res) => {
         const role = user.userRoles[0]?.role || 'freelancer';
         const token = jwt.sign({ userId: user.id, role }, JWT_SECRET, { expiresIn: '7d' });
 
+        // Check S3 for profile picture if not set
+        let avatarUrl = user.avatarUrl;
+        if (!avatarUrl) {
+            const s3ProfilePic = await getProfilePictureFromS3(user.id);
+            if (s3ProfilePic) {
+                avatarUrl = s3ProfilePic;
+            }
+        }
+
         res.json({
             message: 'Login successful',
             token,
@@ -137,6 +147,7 @@ router.post('/login', async (req, res) => {
                 id: user.id,
                 email: user.email,
                 fullName: user.fullName,
+                avatarUrl: avatarUrl,
                 role
             }
         });
@@ -160,11 +171,20 @@ router.get('/me', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        // Check S3 for profile picture if not set
+        let avatarUrl = user.avatarUrl;
+        if (!avatarUrl) {
+            const s3ProfilePic = await getProfilePictureFromS3(user.id);
+            if (s3ProfilePic) {
+                avatarUrl = s3ProfilePic;
+            }
+        }
+
         res.json({
             id: user.id,
             email: user.email,
             fullName: user.fullName,
-            avatarUrl: user.avatarUrl,
+            avatarUrl: avatarUrl,
             bio: user.bio,
             role: user.userRoles[0]?.role || 'freelancer'
         });

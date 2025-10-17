@@ -169,6 +169,16 @@ class ApiClient {
                 body: JSON.stringify(data),
             });
         },
+
+        uploadProfilePicture: async (file: File) => {
+            const formData = new FormData();
+            formData.append('profilePicture', file);
+
+            return this.request('/profile/picture/upload', {
+                method: 'POST',
+                body: formData,
+            });
+        },
     };
 
     // Job endpoints
