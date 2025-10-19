@@ -170,12 +170,19 @@ export const JobReview = ({ formData }: JobReviewProps) => {
             <div className="p-4 bg-warning/10 rounded-lg border border-warning/30">
                 <h4 className="font-medium mb-2 flex items-center space-x-2">
                     <span className="text-warning">⚠️</span>
-                    <span>Staking Requirement</span>
+                    <span>Staking & Fee Requirements</span>
                 </h4>
+                <p className="text-sm text-muted-foreground mb-2">
+                    When you select a freelancer, you'll be required to stake the{" "}
+                    <strong className="text-warning">full amount: {formData.totalPayment.toFixed(2)} SOL</strong>{" "}
+                    in an escrow contract. This ensures payment security for the freelancer.
+                </p>
+                <p className="text-sm text-muted-foreground mb-2">
+                    <strong>Note:</strong> You can cancel the job and recover your funds at any time{" "}
+                    <em>before approving any milestones</em>. Once milestones are approved, payments are released to the freelancer.
+                </p>
                 <p className="text-sm text-muted-foreground">
-                    When you select a freelancer, you'll be required to stake at least{" "}
-                    <strong className="text-warning">{(formData.totalPayment * 0.2).toFixed(2)} SOL</strong>{" "}
-                    (20% of total payment). This ensures payment security for the freelancer.
+                    <strong>Transaction fees:</strong> You'll also need to pay small Solana network fees for creating the escrow contract and approving milestones.
                 </p>
             </div>
 

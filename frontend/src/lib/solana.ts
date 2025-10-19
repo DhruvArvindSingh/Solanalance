@@ -1,0 +1,162 @@
+import * as anchor from "@coral-xyz/anchor";
+import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import idl from "./freelance_platform_idl.json";
+
+// Program ID from the deployed contract
+export const PROGRAM_ID = new PublicKey("BZicjRE3jR6YVWYof7pGSFwqJpJVEBZkY7xzfUimrjhm");
+
+// Platform authority wallet (from the contract)
+export const PLATFORM_AUTHORITY = new PublicKey("CMvVjcRz1CfmbLJ2RRUsDBYXh4bRcWttpkNY7FREHLUK");
+
+// RPC connection - use devnet for testing, mainnet for production
+const RPC_ENDPOINT = import.meta.env.VITE_SOLANA_RPC_URL || clusterApiUrl("devnet");
+
+// Create a connection that can be shared
+export const connection = new Connection(RPC_ENDPOINT, "confirmed");
+
+/**
+ * Get the Anchor program instance
+ * @param wallet - Connected wallet adapter instance
+ * @returns Anchor Program instance
+ */
+export function getProgram(wallet: any): Program {
+    const provider = new AnchorProvider(
+        connection,
+        wallet,
+        AnchorProvider.defaultOptions()
+    );
+    return new Program(idl as any, PROGRAM_ID, provider);
+}
+
+/**
+ * Derive the PDA (Program Derived Address) for an escrow account
+ * @param recruiterPubkey - Public key of the recruiter
+ * @param jobId - Job ID string (max 50 characters)
+ * @returns [PDA PublicKey, bump seed]
+ */
+export function deriveEscrowPDA(
+    recruiterPubkey: PublicKey,
+    jobId: string
+): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+        [
+            Buffer.from("escrow"),
+            recruiterPubkey.toBuffer(),
+            Buffer.from(jobId),
+        ],
+        PROGRAM_ID
+    );
+}
+
+/**
+ * Convert SOL to lamports
+ * @param sol - Amount in SOL
+ * @returns Amount in lamports (BN)
+ */
+export function solToLamports(sol: number): BN {
+    return new BN(sol * anchor.web3.LAMPORTS_PER_SOL);
+}
+
+/**
+ * Convert lamports to SOL
+ * @param lamports - Amount in lamports (can be BN or number)
+ * @returns Amount in SOL
+ */
+export function lamportsToSol(lamports: BN | number): number {
+    const amount = typeof lamports === "number" ? lamports : lamports.toNumber();
+    return amount / anchor.web3.LAMPORTS_PER_SOL;
+}
+
+/**
+ * Get escrow account data (read-only, no wallet needed)
+ * @param recruiterWallet - Recruiter's wallet address (string or PublicKey)
+ * @param jobId - Job ID
+ * @returns Escrow account data or null if not found
+ */
+export async function getEscrowAccount(
+    recruiterWallet: string | PublicKey,
+    jobId: string
+) {
+    try {
+        const recruiterPubkey = typeof recruiterWallet === "string"
+            ? new PublicKey(recruiterWallet)
+            : recruiterWallet;
+
+        const [escrowPDA] = deriveEscrowPDA(recruiterPubkey, jobId);
+
+        // Create a dummy wallet for read-only operations
+        const dummyWallet = {
+            publicKey: recruiterPubkey,
+            signTransaction: async (tx: any) => tx,
+            signAllTransactions: async (txs: any) => txs,
+        };
+
+        const program = getProgram(dummyWallet);
+        const escrowAccount = await program.account.escrow.fetch(escrowPDA);
+
+        return {
+            address: escrowPDA.toBase58(),
+            recruiter: escrowAccount.recruiter.toBase58(),
+            freelancer: escrowAccount.freelancer.toBase58(),
+            jobId: escrowAccount.jobId,
+            milestoneAmounts: escrowAccount.milestoneAmounts.map((bn: BN) => lamportsToSol(bn)),
+            milestonesApproved: escrowAccount.milestonesApproved,
+            milestonesClaimed: escrowAccount.milestonesClaimed,
+            bump: escrowAccount.bump,
+        };
+    } catch (error) {
+        console.error("Error fetching escrow account:", error);
+        return null;
+    }
+}
+
+/**
+ * Get the SOL balance of an escrow account
+ * @param recruiterWallet - Recruiter's wallet address
+ * @param jobId - Job ID
+ * @returns Balance in SOL, or null if account doesn't exist
+ */
+export async function getEscrowBalance(
+    recruiterWallet: string | PublicKey,
+    jobId: string
+): Promise<number | null> {
+    try {
+        const recruiterPubkey = typeof recruiterWallet === "string"
+            ? new PublicKey(recruiterWallet)
+            : recruiterWallet;
+
+        const [escrowPDA] = deriveEscrowPDA(recruiterPubkey, jobId);
+        const balance = await connection.getBalance(escrowPDA);
+        return lamportsToSol(balance);
+    } catch (error) {
+        console.error("Error fetching escrow balance:", error);
+        return null;
+    }
+}
+
+/**
+ * Check if a wallet address is valid
+ * @param address - Wallet address string
+ * @returns true if valid, false otherwise
+ */
+export function isValidSolanaAddress(address: string): boolean {
+    try {
+        new PublicKey(address);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export type EscrowAccount = {
+    address: string;
+    recruiter: string;
+    freelancer: string;
+    jobId: string;
+    milestoneAmounts: number[];
+    milestonesApproved: boolean[];
+    milestonesClaimed: boolean[];
+    bump: number;
+};
+

@@ -15,6 +15,7 @@ import ratingRoutes from './routes/ratings';
 import messageRoutes from './routes/messages';
 import notificationRoutes from './routes/notifications';
 import conversationRoutes from './routes/conversations';
+import escrowRoutes from './routes/escrow';
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use('/api/ratings', ratingRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/escrow', escrowRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

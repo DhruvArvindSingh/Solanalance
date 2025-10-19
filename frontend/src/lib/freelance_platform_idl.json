@@ -1,0 +1,488 @@
+{
+    "address": "BZicjRE3jR6YVWYof7pGSFwqJpJVEBZkY7xzfUimrjhm",
+    "metadata": {
+        "name": "freelance_platform",
+        "version": "0.1.0",
+        "spec": "0.1.0",
+        "description": "Created with Anchor"
+    },
+    "instructions": [
+        {
+            "name": "approve_milestone",
+            "docs": [
+                "Recruiter approves a completed milestone"
+            ],
+            "discriminator": [
+                145,
+                85,
+                92,
+                60,
+                50,
+                130,
+                219,
+                106
+            ],
+            "accounts": [
+                {
+                    "name": "escrow",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    101,
+                                    115,
+                                    99,
+                                    114,
+                                    111,
+                                    119
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "escrow.recruiter",
+                                "account": "Escrow"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "escrow.job_id",
+                                "account": "Escrow"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "recruiter",
+                    "signer": true,
+                    "relations": [
+                        "escrow"
+                    ]
+                }
+            ],
+            "args": [
+                {
+                    "name": "milestone_index",
+                    "type": "u8"
+                }
+            ]
+        },
+        {
+            "name": "cancel_job",
+            "docs": [
+                "Cancel job and refund recruiter (only if no milestones approved)"
+            ],
+            "discriminator": [
+                126,
+                241,
+                155,
+                241,
+                50,
+                236,
+                83,
+                118
+            ],
+            "accounts": [
+                {
+                    "name": "escrow",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    101,
+                                    115,
+                                    99,
+                                    114,
+                                    111,
+                                    119
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "escrow.recruiter",
+                                "account": "Escrow"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "escrow.job_id",
+                                "account": "Escrow"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "recruiter",
+                    "writable": true,
+                    "signer": true,
+                    "relations": [
+                        "escrow"
+                    ]
+                }
+            ],
+            "args": []
+        },
+        {
+            "name": "claim_milestone",
+            "docs": [
+                "Freelancer claims payment for approved milestone"
+            ],
+            "discriminator": [
+                211,
+                134,
+                152,
+                37,
+                3,
+                82,
+                214,
+                189
+            ],
+            "accounts": [
+                {
+                    "name": "escrow",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    101,
+                                    115,
+                                    99,
+                                    114,
+                                    111,
+                                    119
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "escrow.recruiter",
+                                "account": "Escrow"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "escrow.job_id",
+                                "account": "Escrow"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "freelancer",
+                    "writable": true,
+                    "signer": true,
+                    "relations": [
+                        "escrow"
+                    ]
+                }
+            ],
+            "args": [
+                {
+                    "name": "milestone_index",
+                    "type": "u8"
+                }
+            ]
+        },
+        {
+            "name": "create_job_escrow",
+            "docs": [
+                "Creates escrow PDA and locks funds for a job"
+            ],
+            "discriminator": [
+                42,
+                204,
+                194,
+                53,
+                124,
+                113,
+                189,
+                230
+            ],
+            "accounts": [
+                {
+                    "name": "escrow",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    101,
+                                    115,
+                                    99,
+                                    114,
+                                    111,
+                                    119
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "recruiter"
+                            },
+                            {
+                                "kind": "arg",
+                                "path": "job_id"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "recruiter",
+                    "writable": true,
+                    "signer": true
+                },
+                {
+                    "name": "system_program",
+                    "address": "11111111111111111111111111111111"
+                }
+            ],
+            "args": [
+                {
+                    "name": "job_id",
+                    "type": "string"
+                },
+                {
+                    "name": "freelancer",
+                    "type": "pubkey"
+                },
+                {
+                    "name": "milestone_amounts",
+                    "type": {
+                        "array": [
+                            "u64",
+                            3
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "name": "platform_emergency_close",
+            "docs": [
+                "🔥 NEW: Platform owner can withdraw and close escrow completely"
+            ],
+            "discriminator": [
+                162,
+                6,
+                9,
+                42,
+                201,
+                207,
+                30,
+                42
+            ],
+            "accounts": [
+                {
+                    "name": "escrow",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    101,
+                                    115,
+                                    99,
+                                    114,
+                                    111,
+                                    119
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "escrow.recruiter",
+                                "account": "Escrow"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "escrow.job_id",
+                                "account": "Escrow"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "platform_authority",
+                    "writable": true,
+                    "signer": true
+                }
+            ],
+            "args": []
+        },
+        {
+            "name": "platform_withdraw",
+            "docs": [
+                "🔥 NEW: Platform owner can withdraw any amount from escrow",
+                "Use cases: platform fees, dispute resolution, emergency withdrawals"
+            ],
+            "discriminator": [
+                2,
+                70,
+                98,
+                150,
+                243,
+                196,
+                244,
+                82
+            ],
+            "accounts": [
+                {
+                    "name": "escrow",
+                    "writable": true,
+                    "pda": {
+                        "seeds": [
+                            {
+                                "kind": "const",
+                                "value": [
+                                    101,
+                                    115,
+                                    99,
+                                    114,
+                                    111,
+                                    119
+                                ]
+                            },
+                            {
+                                "kind": "account",
+                                "path": "escrow.recruiter",
+                                "account": "Escrow"
+                            },
+                            {
+                                "kind": "account",
+                                "path": "escrow.job_id",
+                                "account": "Escrow"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "platform_authority",
+                    "writable": true,
+                    "signer": true
+                }
+            ],
+            "args": [
+                {
+                    "name": "amount",
+                    "type": "u64"
+                }
+            ]
+        }
+    ],
+    "accounts": [
+        {
+            "name": "Escrow",
+            "discriminator": [
+                31,
+                213,
+                123,
+                187,
+                186,
+                22,
+                218,
+                155
+            ]
+        }
+    ],
+    "errors": [
+        {
+            "code": 6000,
+            "name": "JobIdTooLong",
+            "msg": "Job ID cannot exceed 50 characters"
+        },
+        {
+            "code": 6001,
+            "name": "InvalidMilestoneAmount",
+            "msg": "All milestone amounts must be greater than 0"
+        },
+        {
+            "code": 6002,
+            "name": "InvalidMilestoneIndex",
+            "msg": "Invalid milestone index (must be 0, 1, or 2)"
+        },
+        {
+            "code": 6003,
+            "name": "MilestoneAlreadyApproved",
+            "msg": "Milestone has already been approved"
+        },
+        {
+            "code": 6004,
+            "name": "MilestoneNotApproved",
+            "msg": "Milestone has not been approved yet"
+        },
+        {
+            "code": 6005,
+            "name": "MilestoneAlreadyClaimed",
+            "msg": "Milestone has already been claimed"
+        },
+        {
+            "code": 6006,
+            "name": "CannotCancelAfterApproval",
+            "msg": "Cannot cancel job after milestone approval"
+        },
+        {
+            "code": 6007,
+            "name": "InsufficientEscrowBalance",
+            "msg": "Insufficient balance in escrow"
+        },
+        {
+            "code": 6008,
+            "name": "UnauthorizedPlatformAccess",
+            "msg": "Unauthorized: Only platform authority can perform this action"
+        }
+    ],
+    "types": [
+        {
+            "name": "Escrow",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "recruiter",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "freelancer",
+                        "type": "pubkey"
+                    },
+                    {
+                        "name": "job_id",
+                        "type": "string"
+                    },
+                    {
+                        "name": "milestone_amounts",
+                        "type": {
+                            "array": [
+                                "u64",
+                                3
+                            ]
+                        }
+                    },
+                    {
+                        "name": "milestones_approved",
+                        "type": {
+                            "array": [
+                                "bool",
+                                3
+                            ]
+                        }
+                    },
+                    {
+                        "name": "milestones_claimed",
+                        "type": {
+                            "array": [
+                                "bool",
+                                3
+                            ]
+                        }
+                    },
+                    {
+                        "name": "bump",
+                        "type": "u8"
+                    }
+                ]
+            }
+        }
+    ]
+}
