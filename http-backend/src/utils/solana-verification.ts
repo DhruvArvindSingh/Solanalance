@@ -7,9 +7,10 @@
 
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { createHash } from "crypto";
 
 // Program ID from deployed contract
-const PROGRAM_ID = new PublicKey("BZicjRE3jR6YVWYof7pGSFwqJpJVEBZkY7xzfUimrjhm");
+const PROGRAM_ID = new PublicKey("xXBP5XebxLWY2bG3691JeTbCRmcjjncAm5n7jMvVevm");
 
 // RPC endpoint - should match your network (devnet/mainnet)
 const RPC_ENDPOINT = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
@@ -18,17 +19,25 @@ const RPC_ENDPOINT = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.co
 const connection = new Connection(RPC_ENDPOINT, "confirmed");
 
 /**
- * Derive the escrow PDA address
+ * Hash jobId to create a 32-byte seed for PDA
+ */
+function hashJobId(jobId: string): Buffer {
+    return createHash('sha256').update(jobId, 'utf8').digest();
+}
+
+/**
+ * Derive the escrow PDA address using hashed jobId
  */
 export function deriveEscrowPDA(
     recruiterPubkey: PublicKey,
     jobId: string
 ): [PublicKey, number] {
+    const jobIdHash = hashJobId(jobId);
     return PublicKey.findProgramAddressSync(
         [
             Buffer.from("escrow"),
             recruiterPubkey.toBuffer(),
-            Buffer.from(jobId),
+            jobIdHash,
         ],
         PROGRAM_ID
     );

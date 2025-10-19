@@ -34,8 +34,11 @@ router.post('/',
                 jobId,
                 coverLetterText,
                 estimatedCompletionDays,
-                portfolioUrls
+                portfolioUrls,
+                walletAddress
             } = req.body;
+            console.log("application route hit");
+            console.log(req.body);
 
             const freelancerId = req.user?.id;
             const files = (req.files as Record<string, Express.Multer.File[]>) || {};
@@ -107,7 +110,8 @@ router.post('/',
                     coverLetterFileUrl,
                     resumeFileUrl,
                     estimatedCompletionDays: parseInt(estimatedCompletionDays),
-                    portfolioUrls: portfolioUrls ? JSON.parse(portfolioUrls) : []
+                    portfolioUrls: portfolioUrls ? JSON.parse(portfolioUrls) : [],
+                    walletAddress
                 },
                 include: {
                     job: true,

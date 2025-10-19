@@ -167,6 +167,7 @@ model Application {
   resumeFileUrl           String?  @map("resume_file_url")
   estimatedCompletionDays Int      @map("estimated_completion_days")
   portfolioUrls           String[] @default([]) @map("portfolio_urls")
+  walletAddress           String?  @map("wallet_address")
   status                  String   @default("pending")
   createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)

@@ -314,6 +314,7 @@ router.get('/:id/applicants', authenticateToken, requireRole('recruiter'), async
                     resume_file_url: app.resumeFileUrl,
                     estimated_completion_days: app.estimatedCompletionDays,
                     portfolio_urls: app.portfolioUrls,
+                    wallet_address: app.walletAddress,
                     status: app.status,
                     created_at: app.createdAt,
                     freelancer: {

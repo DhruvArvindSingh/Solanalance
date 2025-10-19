@@ -458,3 +458,4 @@ await fundJobEscrow(jobId, wallet, milestones, (result) => {
 The new hook provides the same developer experience but with added security and verification. Simply replace your imports and enjoy automatic backend verification!
 
 
+

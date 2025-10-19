@@ -1,10 +1,19 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
+use sha2::{Sha256, Digest};
 
-declare_id!("BZicjRE3jR6YVWYof7pGSFwqJpJVEBZkY7xzfUimrjhm");
+declare_id!("xXBP5XebxLWY2bG3691JeTbCRmcjjncAm5n7jMvVevm");
 
 // 🔑 REPLACE THIS WITH YOUR ACTUAL WALLET ADDRESS
 const PLATFORM_AUTHORITY: &str = "CMvVjcRz1CfmbLJ2RRUsDBYXh4bRcWttpkNY7FREHLUK";
+
+/// Hash job_id to create a 32-byte seed for PDA (matches frontend implementation)
+fn hash_job_id(job_id: &str) -> [u8; 32] {
+    // Use SHA-256 to match frontend implementation
+    let mut hasher = Sha256::new();
+    hasher.update(job_id.as_bytes());
+    hasher.finalize().into()
+}
 
 #[program]
 pub mod freelance_platform {
@@ -192,7 +201,7 @@ pub struct CreateJobEscrow<'info> {
         init,
         payer = recruiter,
         space = 8 + Escrow::INIT_SPACE,
-        seeds = [b"escrow", recruiter.key().as_ref(), job_id.as_bytes()],
+        seeds = [b"escrow", recruiter.key().as_ref(), &hash_job_id(&job_id)],
         bump
     )]
     pub escrow: Account<'info, Escrow>,
@@ -210,7 +219,7 @@ pub struct ApproveMilestone<'info> {
         seeds = [
             b"escrow",
             escrow.recruiter.as_ref(),
-            escrow.job_id.as_bytes()
+            &hash_job_id(&escrow.job_id)
         ],
         bump = escrow.bump,
         has_one = recruiter
@@ -227,7 +236,7 @@ pub struct ClaimMilestone<'info> {
         seeds = [
             b"escrow",
             escrow.recruiter.as_ref(),
-            escrow.job_id.as_bytes()
+            &hash_job_id(&escrow.job_id)
         ],
         bump = escrow.bump,
         has_one = freelancer
@@ -245,7 +254,7 @@ pub struct CancelJob<'info> {
         seeds = [
             b"escrow",
             escrow.recruiter.as_ref(),
-            escrow.job_id.as_bytes()
+            &hash_job_id(&escrow.job_id)
         ],
         bump = escrow.bump,
         has_one = recruiter,
@@ -265,7 +274,7 @@ pub struct PlatformWithdraw<'info> {
         seeds = [
             b"escrow",
             escrow.recruiter.as_ref(),
-            escrow.job_id.as_bytes()
+            &hash_job_id(&escrow.job_id)
         ],
         bump = escrow.bump
     )]
@@ -286,7 +295,7 @@ pub struct PlatformEmergencyClose<'info> {
         seeds = [
             b"escrow",
             escrow.recruiter.as_ref(),
-            escrow.job_id.as_bytes()
+            &hash_job_id(&escrow.job_id)
         ],
         bump = escrow.bump,
         close = platform_authority

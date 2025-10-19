@@ -2,8 +2,14 @@
 seeds = false
 skip-lint = false
 
+[programs.localnet]
+freelance_platform = "xXBP5XebxLWY2bG3691JeTbCRmcjjncAm5n7jMvVevm"
+
+[programs.mainnet]
+freelance_platform = "xXBP5XebxLWY2bG3691JeTbCRmcjjncAm5n7jMvVevm"
+
 [programs.devnet]
-freelance_platform = "BZicjRE3jR6YVWYof7pGSFwqJpJVEBZkY7xzfUimrjhm"
+freelance_platform = "xXBP5XebxLWY2bG3691JeTbCRmcjjncAm5n7jMvVevm"
 
 [registry]
 url = "https://api.apr.dev"

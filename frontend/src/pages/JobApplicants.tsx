@@ -44,6 +44,7 @@ interface Application {
     resume_file_url: string | null;
     estimated_completion_days: number;
     portfolio_urls: string[] | null;
+    wallet_address: string | null;
     status: string;
     created_at: string;
     freelancer: {
@@ -97,6 +98,8 @@ export default function JobApplicants() {
             if (data) {
                 setJob(data.job);
                 setApplications(data.applications || []);
+                console.log("applications.wallet_address", applications.wallet_address);
+                console.log("applications", data.applications);
             }
         } catch (error: any) {
             console.error("Error fetching applications:", error);
@@ -107,6 +110,10 @@ export default function JobApplicants() {
     };
 
     const handleSelectFreelancer = async (application: Application) => {
+        if (!application.wallet_address) {
+            toast.error("Freelancer did not provide a wallet address in their application. Please contact them to add one.");
+            return;
+        }
         setSelectedApplication(application);
         setShowStakingModal(true);
     };
@@ -559,7 +566,7 @@ export default function JobApplicants() {
                     jobId={job.id}
                     jobTitle={job.title}
                     freelancerName={selectedApplication.freelancer.full_name}
-                    freelancerId={selectedApplication.freelancer_id}
+                    freelancerWallet={selectedApplication.wallet_address || ""}
                     totalPayment={job.total_payment}
                     onSuccess={handleStakingSuccess}
                 />
