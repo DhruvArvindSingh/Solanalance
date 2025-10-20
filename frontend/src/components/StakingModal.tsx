@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { LAMPORTS_PER_SOL, SystemProgram, Transaction } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { apiClient } from "@/integrations/apiClient/client";
 import { useAuth } from "@/hooks/useAuth";
+import { fundJob } from "@/lib/escrow-operations";
 import {
     Dialog,
     DialogContent,
@@ -11,9 +12,6 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Coins, AlertCircle, Loader2, CheckCircle } from "lucide-react";
@@ -24,7 +22,8 @@ interface StakingModalProps {
     jobId: string;
     jobTitle: string;
     freelancerName: string;
-    freelancerId: string;
+    freelancerId: string; // Database UUID for backend
+    freelancerWallet: string; // Solana wallet address for smart contract
     totalPayment: number;
     onSuccess: () => void;
 }
@@ -36,15 +35,16 @@ export const StakingModal = ({
     jobTitle,
     freelancerName,
     freelancerId,
+    freelancerWallet,
     totalPayment,
     onSuccess,
 }: StakingModalProps) => {
     const { user } = useAuth();
     const { connection } = useConnection();
-    const { publicKey, sendTransaction, connected } = useWallet();
+    const wallet = useWallet();
+    const { publicKey, connected } = wallet;
 
-    const minimumStake = totalPayment * 0.2;
-    const [stakeAmount, setStakeAmount] = useState(minimumStake);
+    // Contract requires 100% of payment to be locked in escrow
     const [isStaking, setIsStaking] = useState(false);
     const [balance, setBalance] = useState<number | null>(null);
 
@@ -71,63 +71,102 @@ export const StakingModal = ({
             return;
         }
 
-        if (stakeAmount < minimumStake) {
-            toast.error(`Minimum stake is ${minimumStake.toFixed(2)} SOL`);
-            return;
-        }
-
-        if (balance !== null && stakeAmount > balance) {
-            toast.error("Insufficient balance");
+        if (balance !== null && totalPayment > balance) {
+            toast.error(`Insufficient balance. Required: ${totalPayment.toFixed(4)} SOL`);
             return;
         }
 
         setIsStaking(true);
 
         try {
-            // In a real implementation, this would send SOL to a program-controlled escrow account
-            // For this demo, we'll simulate the transaction
+            // TODO: Fetch actual milestone amounts from job_stages table in database
+            // For now, evenly divide the total payment into 3 milestones
+            const milestoneAmount = totalPayment / 3;
+            const milestones: [number, number, number] = [
+                milestoneAmount,
+                milestoneAmount,
+                milestoneAmount
+            ];
 
-            // Create a dummy transaction (in production, this would be to an escrow PDA)
-            const transaction = new Transaction().add(
-                SystemProgram.transfer({
-                    fromPubkey: publicKey,
-                    toPubkey: publicKey, // In production, this would be the escrow account
-                    lamports: Math.floor(stakeAmount * LAMPORTS_PER_SOL),
-                })
+            console.log("Creating escrow with milestones:", milestones);
+            console.log("✅ Using freelancer wallet address:", freelancerWallet);
+
+            // Validate wallet address
+            if (!freelancerWallet || freelancerWallet.length < 32) {
+                throw new Error("Invalid freelancer wallet address. Please ensure the freelancer provided a valid Solana wallet.");
+            }
+
+            // Call the actual Solana smart contract to create escrow and lock funds
+            const result = await fundJob(
+                { publicKey, signTransaction: wallet.signTransaction, signAllTransactions: wallet.signAllTransactions },
+                jobId,
+                freelancerWallet, // ✅ Using freelancer's Solana wallet address from application
+                milestones
             );
 
-            // Send transaction
-            const signature = await sendTransaction(transaction, connection);
+            if (!result.success) {
+                throw new Error(result.error || "Failed to create escrow");
+            }
 
-            // Wait for confirmation
-            await connection.confirmTransaction(signature, "confirmed");
+            if (result.txSignature === "already-created") {
+                console.log("✅ Escrow already exists from previous transaction!");
+                console.log("Escrow PDA:", result.escrowPDA);
+                console.log("Message:", result.message);
+            } else {
+                console.log("✅ Escrow created on-chain!");
+                console.log("Escrow PDA:", result.escrowPDA);
+                console.log("Transaction:", result.txSignature);
+            }
 
-            // Create project and staking through backend API
-            const { data: stakingData, error: stakingError } = await apiClient.staking.create({
-                jobId,
-                freelancerId,
-                totalStaked: stakeAmount,
-                walletAddress: publicKey.toBase58(),
-                transactionSignature: signature,
-            });
+            // Always verify and store transaction data in backend
+            // Backend will check for duplicates and verify on-chain state
+            console.log("Verifying escrow with backend...");
 
-            if (stakingError) throw new Error(stakingError);
+            try {
+                const response = await fetch('http://localhost:3000/api/escrow/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('session')}`
+                    },
+                    body: JSON.stringify({
+                        jobId,
+                        escrowPDA: result.escrowPDA,
+                        transactionSignature: result.txSignature,
+                        freelancerId,
+                        totalStaked: totalPayment
+                    })
+                });
 
-            toast.success("Staking successful! Project started.");
+                const verifyResult = await response.json();
+
+                if (response.ok) {
+                    if (verifyResult.alreadyExists) {
+                        console.log("✓ Transaction already recorded in database");
+                        toast.success("Escrow verified! Transaction already recorded.");
+                    } else {
+                        console.log("✓ Escrow verified and recorded");
+                        toast.success("Success! Funds verified and locked in escrow.");
+                    }
+                } else {
+                    console.error("Backend verification failed:", verifyResult.error);
+                    toast.warning("Funds locked on-chain, but verification failed. Please use 'Verify Funds' button.");
+                }
+            } catch (backendError) {
+                console.error("Backend communication error:", backendError);
+                toast.warning("Funds locked on-chain, but couldn't sync with backend. Please use 'Verify Funds' button.");
+            }
+
             onSuccess();
         } catch (error: any) {
-            console.error("Error staking:", error);
-            toast.error(error.message || "Failed to stake. Please try again.");
+            console.error("Error creating escrow:", error);
+            toast.error(error.message || "Failed to create escrow. Please try again.");
         } finally {
             setIsStaking(false);
         }
     };
 
-    const handleSliderChange = (value: number[]) => {
-        setStakeAmount(value[0]);
-    };
-
-    const insufficientBalance = balance !== null && stakeAmount > balance;
+    const insufficientBalance = balance !== null && totalPayment > balance;
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -135,10 +174,10 @@ export const StakingModal = ({
                 <DialogHeader>
                     <DialogTitle className="text-2xl flex items-center space-x-2">
                         <Coins className="w-6 h-6 text-secondary" />
-                        <span>Stake Funds</span>
+                        <span>Lock Funds in Escrow</span>
                     </DialogTitle>
                     <DialogDescription>
-                        Stake funds to start the project with {freelancerName}
+                        Lock funds in smart contract escrow to start working with {freelancerName}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -156,9 +195,9 @@ export const StakingModal = ({
                             <span className="font-semibold">{totalPayment.toFixed(2)} SOL</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Minimum Required (20%):</span>
-                            <span className="font-semibold text-warning">
-                                {minimumStake.toFixed(2)} SOL
+                            <span className="text-muted-foreground">Amount to Lock in Escrow:</span>
+                            <span className="font-semibold text-secondary">
+                                {totalPayment.toFixed(2)} SOL (100%)
                             </span>
                         </div>
                         {balance !== null && (
@@ -171,38 +210,16 @@ export const StakingModal = ({
                         )}
                     </div>
 
-                    {/* Stake Amount Input */}
-                    <div className="space-y-3">
-                        <Label htmlFor="stakeAmount">Stake Amount (SOL)</Label>
-                        <div className="relative">
-                            <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                            <Input
-                                id="stakeAmount"
-                                type="number"
-                                step="0.01"
-                                min={minimumStake}
-                                max={totalPayment}
-                                value={stakeAmount}
-                                onChange={(e) => setStakeAmount(parseFloat(e.target.value) || 0)}
-                                className="pl-11 text-lg font-semibold"
-                            />
+                    {/* Escrow Details */}
+                    <div className="p-4 bg-secondary/10 border border-secondary/20 rounded-lg space-y-2">
+                        <div className="flex items-center space-x-2 text-secondary">
+                            <Coins className="w-5 h-5" />
+                            <span className="font-semibold">Smart Contract Escrow</span>
                         </div>
-
-                        {/* Slider */}
-                        <div className="pt-2">
-                            <Slider
-                                min={minimumStake}
-                                max={totalPayment}
-                                step={0.01}
-                                value={[stakeAmount]}
-                                onValueChange={handleSliderChange}
-                                className="w-full"
-                            />
-                            <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                                <span>Min: {minimumStake.toFixed(2)}</span>
-                                <span>Max: {totalPayment.toFixed(2)}</span>
-                            </div>
-                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            Your {totalPayment.toFixed(2)} SOL will be locked in a secure Solana smart contract escrow account.
+                            Funds are automatically released to the freelancer as they complete each milestone.
+                        </p>
                     </div>
 
                     {/* Wallet Connection Alert */}
@@ -220,20 +237,10 @@ export const StakingModal = ({
                         <Alert className="border-destructive/30 bg-destructive/10">
                             <AlertCircle className="h-4 w-4" />
                             <AlertDescription>
-                                Insufficient balance. You need at least {stakeAmount.toFixed(2)} SOL
+                                Insufficient balance. You need at least {totalPayment.toFixed(2)} SOL + gas fees
                             </AlertDescription>
                         </Alert>
                     )}
-
-                    {/* Info Alert */}
-                    <Alert className="border-primary/30 bg-primary/10">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="text-sm">
-                            Your stake will be held in escrow and automatically released to the freelancer
-                            as they complete each milestone. You can stake more than the minimum for
-                            additional security.
-                        </AlertDescription>
-                    </Alert>
 
                     {/* Actions */}
                     <div className="flex space-x-3 pt-4">
@@ -247,18 +254,18 @@ export const StakingModal = ({
                         </Button>
                         <Button
                             onClick={handleStake}
-                            disabled={!connected || isStaking || insufficientBalance || stakeAmount < minimumStake}
+                            disabled={!connected || isStaking || insufficientBalance}
                             className="flex-1 bg-gradient-solana"
                         >
                             {isStaking ? (
                                 <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Staking...
+                                    Creating Escrow...
                                 </>
                             ) : (
                                 <>
                                     <CheckCircle className="w-4 h-4 mr-2" />
-                                    Stake {stakeAmount.toFixed(2)} SOL
+                                    Lock {totalPayment.toFixed(2)} SOL in Escrow
                                 </>
                             )}
                         </Button>

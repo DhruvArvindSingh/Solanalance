@@ -4,7 +4,7 @@ import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
 import idl from "./freelance_platform_idl.json";
 
 // Program ID from the deployed contract
-export const PROGRAM_ID = new PublicKey("BZicjRE3jR6YVWYof7pGSFwqJpJVEBZkY7xzfUimrjhm");
+export const PROGRAM_ID = new PublicKey("xXBP5XebxLWY2bG3691JeTbCRmcjjncAm5n7jMvVevm");
 
 // Platform authority wallet (from the contract)
 export const PLATFORM_AUTHORITY = new PublicKey("CMvVjcRz1CfmbLJ2RRUsDBYXh4bRcWttpkNY7FREHLUK");
@@ -26,24 +26,42 @@ export function getProgram(wallet: any): Program {
         wallet,
         AnchorProvider.defaultOptions()
     );
-    return new Program(idl as any, PROGRAM_ID, provider);
+    // Cast idl to any to avoid TypeScript issues with IDL version compatibility
+    return new Program(idl as any, provider);
+}
+
+/**
+ * Hash job_id using SHA-256 (matches Rust contract implementation)
+ * Uses Web Crypto API for browser compatibility
+ * @param jobId - Job ID string
+ * @returns Promise of 32-byte hash buffer
+ */
+async function hashJobIdAsync(jobId: string): Promise<Uint8Array> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(jobId);
+    // Use globalThis.crypto to avoid TypeScript issues
+    const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data as BufferSource);
+    return new Uint8Array(hashBuffer);
 }
 
 /**
  * Derive the PDA (Program Derived Address) for an escrow account
+ * IMPORTANT: Uses SHA-256 hash of job_id to match contract implementation
  * @param recruiterPubkey - Public key of the recruiter
  * @param jobId - Job ID string (max 50 characters)
- * @returns [PDA PublicKey, bump seed]
+ * @returns Promise of [PDA PublicKey, bump seed]
  */
-export function deriveEscrowPDA(
+export async function deriveEscrowPDA(
     recruiterPubkey: PublicKey,
     jobId: string
-): [PublicKey, number] {
+): Promise<[PublicKey, number]> {
+    const jobIdHash = await hashJobIdAsync(jobId);
+
     return PublicKey.findProgramAddressSync(
         [
             Buffer.from("escrow"),
             recruiterPubkey.toBuffer(),
-            Buffer.from(jobId),
+            Buffer.from(jobIdHash),
         ],
         PROGRAM_ID
     );
@@ -83,7 +101,7 @@ export async function getEscrowAccount(
             ? new PublicKey(recruiterWallet)
             : recruiterWallet;
 
-        const [escrowPDA] = deriveEscrowPDA(recruiterPubkey, jobId);
+        const [escrowPDA] = await deriveEscrowPDA(recruiterPubkey, jobId);
 
         // Create a dummy wallet for read-only operations
         const dummyWallet = {
@@ -93,7 +111,7 @@ export async function getEscrowAccount(
         };
 
         const program = getProgram(dummyWallet);
-        const escrowAccount = await program.account.escrow.fetch(escrowPDA);
+        const escrowAccount = await (program.account as any).escrow.fetch(escrowPDA);
 
         return {
             address: escrowPDA.toBase58(),
@@ -126,7 +144,7 @@ export async function getEscrowBalance(
             ? new PublicKey(recruiterWallet)
             : recruiterWallet;
 
-        const [escrowPDA] = deriveEscrowPDA(recruiterPubkey, jobId);
+        const [escrowPDA] = await deriveEscrowPDA(recruiterPubkey, jobId);
         const balance = await connection.getBalance(escrowPDA);
         return lamportsToSol(balance);
     } catch (error) {

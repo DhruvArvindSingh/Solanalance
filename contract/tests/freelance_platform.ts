@@ -3,6 +3,12 @@ import { Program, BN } from "@coral-xyz/anchor";
 import { FreelancePlatform } from "../target/types/freelance_platform";
 import { PublicKey, Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { assert } from "chai";
+import { createHash } from "crypto";
+
+// Helper function to hash job_id (matches Rust implementation)
+function hashJobId(jobId: string): Buffer {
+  return createHash("sha256").update(jobId).digest();
+}
 
 describe("freelance_platform", () => {
   const provider = anchor.AnchorProvider.env();
@@ -31,14 +37,22 @@ describe("freelance_platform", () => {
       recruiter.publicKey,
       10 * LAMPORTS_PER_SOL
     );
-    await provider.connection.confirmTransaction(airdropSig);
+    const latestBlockhash = await provider.connection.getLatestBlockhash();
+    await provider.connection.confirmTransaction({
+      signature: airdropSig,
+      ...latestBlockhash
+    });
 
-    // Derive escrow PDA
+    // Verify balance
+    const balance = await provider.connection.getBalance(recruiter.publicKey);
+    console.log(`Recruiter balance: ${balance / LAMPORTS_PER_SOL} SOL`);
+
+    // Derive escrow PDA using hashed job_id
     [escrowPDA] = PublicKey.findProgramAddressSync(
       [
         Buffer.from("escrow"),
         recruiter.publicKey.toBuffer(),
-        Buffer.from(jobId),
+        hashJobId(jobId),
       ],
       program.programId
     );
@@ -95,16 +109,17 @@ describe("freelance_platform", () => {
 
   it("Prevents creating escrow with invalid milestone amounts", async () => {
     const invalidAmounts = [new BN(0), new BN(1 * LAMPORTS_PER_SOL), new BN(2 * LAMPORTS_PER_SOL)];
+    const invalidJobId = "invalid-job";
 
     try {
       await program.methods
-        .createJobEscrow("invalid-job", freelancer.publicKey, invalidAmounts)
+        .createJobEscrow(invalidJobId, freelancer.publicKey, invalidAmounts)
         .accounts({
           escrow: PublicKey.findProgramAddressSync(
             [
               Buffer.from("escrow"),
               recruiter.publicKey.toBuffer(),
-              Buffer.from("invalid-job"),
+              hashJobId(invalidJobId),
             ],
             program.programId
           )[0],
@@ -208,7 +223,11 @@ describe("freelance_platform", () => {
       freelancer.publicKey,
       1 * LAMPORTS_PER_SOL
     );
-    await provider.connection.confirmTransaction(airdropSig);
+    const latestBlockhash = await provider.connection.getLatestBlockhash();
+    await provider.connection.confirmTransaction({
+      signature: airdropSig,
+      ...latestBlockhash
+    });
 
     const freelancerBalanceBefore = await provider.connection.getBalance(
       freelancer.publicKey
@@ -348,7 +367,7 @@ describe("freelance_platform", () => {
       [
         Buffer.from("escrow"),
         recruiter.publicKey.toBuffer(),
-        Buffer.from(cancelJobId),
+        hashJobId(cancelJobId),
       ],
       program.programId
     );
@@ -397,7 +416,7 @@ describe("freelance_platform", () => {
       [
         Buffer.from("escrow"),
         recruiter.publicKey.toBuffer(),
-        Buffer.from(cancelJobId2),
+        hashJobId(cancelJobId2),
       ],
       program.programId
     );

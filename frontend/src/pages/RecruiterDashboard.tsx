@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Briefcase, Users, TrendingUp, Coins } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { VerifyFundsButton } from "@/components/VerifyFundsButton";
 
 interface JobWithStats {
     id: string;
@@ -242,6 +243,20 @@ export default function RecruiterDashboard() {
                                                                     <span>{job.total_payment.toFixed(2)} SOL</span>
                                                                 </div>
                                                             </div>
+
+                                                            {/* Show Verify Funds button for in-progress jobs */}
+                                                            {job.status === "in_progress" && (
+                                                                <div onClick={(e) => e.stopPropagation()}>
+                                                                    <VerifyFundsButton
+                                                                        jobId={job.id}
+                                                                        jobTitle={job.title}
+                                                                        expectedAmount={job.total_payment}
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                    />
+                                                                </div>
+                                                            )}
+
                                                             <Badge
                                                                 variant="outline"
                                                                 className={getStatusColor(job.status)}

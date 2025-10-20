@@ -348,6 +348,31 @@ class ApiClient {
         },
     };
 
+    // Conversation endpoints
+    conversations = {
+        getAll: async (params?: any) => {
+            const queryString = params ? `?${new URLSearchParams(params).toString()}` : '';
+            return this.request(`/conversations${queryString}`);
+        },
+
+        getById: async (id: string) => {
+            return this.request(`/conversations/${id}`);
+        },
+
+        create: async (data: any) => {
+            return this.request('/conversations', {
+                method: 'POST',
+                body: JSON.stringify(data),
+            });
+        },
+
+        markAsRead: async (id: string) => {
+            return this.request(`/conversations/${id}/read`, {
+                method: 'PUT',
+            });
+        },
+    };
+
     // Utility functions to match Supabase API pattern
     from(table: string) {
         return {

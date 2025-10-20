@@ -11,6 +11,7 @@ import { RatingBadge } from "@/components/RatingBadge";
 import { Briefcase, TrendingUp, Coins, Award } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { VerifyFundsButton } from "@/components/VerifyFundsButton";
 
 interface Application {
     id: string;
@@ -334,21 +335,37 @@ export default function FreelancerDashboard() {
                                                     </div>
                                                 </div>
 
-                                                <div className="text-right ml-4">
-                                                    <div className="flex items-center space-x-1 text-xl font-bold text-gradient mb-2">
+                                                <div className="flex flex-col items-end space-y-2 ml-4">
+                                                    <div className="flex items-center space-x-1 text-xl font-bold text-gradient">
                                                         <Coins className="w-5 h-5" />
                                                         <span>{project.job.total_payment.toFixed(2)} SOL</span>
                                                     </div>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={
-                                                            project.status === "in_progress"
-                                                                ? "bg-primary/10 text-primary border-primary/30"
-                                                                : "bg-success/10 text-success border-success/30"
-                                                        }
-                                                    >
-                                                        {project.status.replace("_", " ")}
-                                                    </Badge>
+
+                                                    <div className="flex items-center space-x-2">
+                                                        {/* Show Verify Funds button for active projects */}
+                                                        {(project.status === "active" || project.status === "in_progress") && (
+                                                            <div onClick={(e) => e.stopPropagation()}>
+                                                                <VerifyFundsButton
+                                                                    jobId={project.job.id}
+                                                                    jobTitle={project.job.title}
+                                                                    expectedAmount={project.job.total_payment}
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                project.status === "in_progress"
+                                                                    ? "bg-primary/10 text-primary border-primary/30"
+                                                                    : "bg-success/10 text-success border-success/30"
+                                                            }
+                                                        >
+                                                            {project.status.replace("_", " ")}
+                                                        </Badge>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

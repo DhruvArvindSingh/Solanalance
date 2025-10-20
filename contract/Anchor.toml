@@ -15,7 +15,7 @@ freelance_platform = "xXBP5XebxLWY2bG3691JeTbCRmcjjncAm5n7jMvVevm"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Devnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

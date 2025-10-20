@@ -26,6 +26,11 @@ router.post('/', authenticateToken, requireRole('recruiter'), async (req, res) =
             return res.status(404).json({ error: 'Job not found' });
         }
 
+        // Validate required fields
+        if (!freelancerId) {
+            return res.status(400).json({ error: 'freelancerId is required' });
+        }
+
         // Create project
         const project = await req.prisma.project.create({
             data: {

@@ -18,7 +18,13 @@ router.get('/my-projects', authenticateToken, async (req, res) => {
                     select: {
                         id: true,
                         title: true,
-                        totalPayment: true
+                        description: true,
+                        totalPayment: true,
+                        skills: true,
+                        experienceLevel: true,
+                        projectDuration: true,
+                        status: true,
+                        createdAt: true
                     }
                 }
             },
@@ -35,7 +41,13 @@ router.get('/my-projects', authenticateToken, async (req, res) => {
             job: {
                 id: project.job.id,
                 title: project.job.title,
-                total_payment: parseFloat(project.job.totalPayment.toString())
+                description: project.job.description,
+                total_payment: parseFloat(project.job.totalPayment.toString()),
+                skills_required: project.job.skills || [],
+                experience_level: project.job.experienceLevel || '',
+                duration: project.job.projectDuration || '',
+                status: project.job.status,
+                created_at: project.job.createdAt
             }
         }));
 
@@ -56,9 +68,15 @@ router.get('/:id', authenticateToken, async (req, res) => {
             include: {
                 job: {
                     select: {
+                        id: true,
                         title: true,
                         description: true,
-                        totalPayment: true
+                        totalPayment: true,
+                        skills: true,
+                        experienceLevel: true,
+                        projectDuration: true,
+                        status: true,
+                        createdAt: true
                     }
                 },
                 stakings: {
@@ -121,9 +139,15 @@ router.get('/:id', authenticateToken, async (req, res) => {
             status: project.status,
             started_at: project.startedAt,
             job: {
+                id: project.job.id,
                 title: project.job.title,
                 description: project.job.description,
-                total_payment: parseFloat(project.job.totalPayment.toString())
+                total_payment: parseFloat(project.job.totalPayment.toString()),
+                skills_required: project.job.skills || [],
+                experience_level: project.job.experienceLevel || '',
+                duration: project.job.projectDuration || '',
+                status: project.job.status,
+                created_at: project.job.createdAt
             },
             staking: {
                 total_staked: parseFloat(staking.totalStaked.toString()),
@@ -162,6 +186,13 @@ router.put('/milestone/:id/submit', authenticateToken, async (req, res) => {
 
         if (milestone.status !== 'in_progress' && milestone.status !== 'revision_requested') {
             return res.status(400).json({ error: 'Milestone cannot be submitted in current state' });
+        }
+
+        // Only allow submission of the current stage milestone
+        if (milestone.stageNumber !== milestone.project.currentStage) {
+            return res.status(400).json({
+                error: `Can only submit milestone for current stage (${milestone.project.currentStage}). This milestone is for stage ${milestone.stageNumber}.`
+            });
         }
 
         const links = submissionLinks

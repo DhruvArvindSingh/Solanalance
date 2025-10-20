@@ -110,7 +110,7 @@ export const useMessagingStore = create<MessagingState>()(
 
         loadConversations: async () => {
             try {
-                const { data, error } = await apiClient.request('/api/conversations', {
+                const { data, error } = await apiClient.request('/conversations', {
                     method: 'GET'
                 });
 
@@ -154,7 +154,7 @@ export const useMessagingStore = create<MessagingState>()(
 
         loadMessages: async (projectId: string) => {
             try {
-                const { data, error } = await apiClient.request(`/api/conversations/${projectId}/messages`, {
+                const { data, error } = await apiClient.request(`/conversations/${projectId}/messages`, {
                     method: 'GET'
                 });
 
@@ -187,7 +187,7 @@ export const useMessagingStore = create<MessagingState>()(
             } else {
                 // Fallback to REST API
                 try {
-                    const { error } = await apiClient.request(`/api/conversations/${projectId}/messages`, {
+                    const { error } = await apiClient.request(`/conversations/${projectId}/messages`, {
                         method: 'POST',
                         body: JSON.stringify({
                             content: content.trim(),
@@ -209,7 +209,7 @@ export const useMessagingStore = create<MessagingState>()(
 
         markAsRead: async (projectId: string) => {
             try {
-                const { error } = await apiClient.request(`/api/conversations/${projectId}/read`, {
+                const { error } = await apiClient.request(`/conversations/${projectId}/read`, {
                     method: 'PATCH'
                 });
 

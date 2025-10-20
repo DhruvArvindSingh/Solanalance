@@ -28,11 +28,13 @@ export const ConversationList = () => {
 
     if (conversations.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-                <MessageCircle className="w-12 h-12 text-muted-foreground mb-4" />
-                <h3 className="font-medium text-foreground mb-2">No conversations yet</h3>
-                <p className="text-sm text-muted-foreground">
-                    Start a conversation when you get selected for a project
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                <div className="p-6 bg-muted/20 rounded-2xl mb-6">
+                    <MessageCircle className="w-12 h-12 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold text-foreground mb-3 text-lg">No conversations yet</h3>
+                <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
+                    Conversations will appear here when you get selected for projects and start chatting with clients
                 </p>
             </div>
         );
@@ -50,65 +52,77 @@ export const ConversationList = () => {
     }
 
     return (
-        <ScrollArea className="h-full">
-            <div className="divide-y divide-border">
-                {filteredConversations.map((conversation) => (
-                    <div
-                        key={conversation.projectId}
-                        onClick={() => selectConversation(conversation.projectId)}
-                        className={`p-3 hover:bg-muted/50 cursor-pointer transition-colors ${selectedProjectId === conversation.projectId
-                            ? 'bg-muted border-r-2 border-primary'
-                            : ''
-                            }`}
-                    >
-                        <div className="flex items-start gap-3">
-                            {/* Avatar with Online Status */}
-                            <div className="relative">
-                                <Avatar className="w-10 h-10">
-                                    <AvatarImage src={conversation.otherUser.avatar || undefined} />
-                                    <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-medium">
-                                        {conversation.otherUser.name?.charAt(0).toUpperCase() || 'U'}
-                                    </AvatarFallback>
-                                </Avatar>
-                                {conversation.otherUser.isOnline && (
-                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
-                                )}
-                            </div>
-
-                            {/* Conversation Info */}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="font-medium text-foreground truncate">
-                                        {conversation.otherUser.name}
-                                    </span>
-                                    {conversation.lastMessage && (
-                                        <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
-                                            {formatDistanceToNow(conversation.lastMessage.timestamp, { addSuffix: true })}
-                                        </span>
+        <div className="h-full flex flex-col w-full">
+            <ScrollArea className="flex-1 w-full">
+                <div className="divide-y divide-border/30 w-full">
+                    {filteredConversations.map((conversation) => (
+                        <div
+                            key={conversation.projectId}
+                            onClick={() => selectConversation(conversation.projectId)}
+                            className={`p-4 hover:bg-muted/30 cursor-pointer transition-all duration-200 hover:shadow-sm ${selectedProjectId === conversation.projectId
+                                ? 'bg-primary/5 border-r-3 border-primary shadow-sm'
+                                : 'hover:bg-muted/20'
+                                }`}
+                        >
+                            <div className="flex items-start gap-4">
+                                {/* Avatar with Online Status */}
+                                <div className="relative flex-shrink-0">
+                                    <Avatar className="w-12 h-12 ring-2 ring-background shadow-sm">
+                                        <AvatarImage src={conversation.otherUser.avatar || undefined} />
+                                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-semibold text-sm">
+                                            {conversation.otherUser.name?.charAt(0).toUpperCase() || 'U'}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    {conversation.otherUser.isOnline && (
+                                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 border-2 border-background rounded-full shadow-sm animate-pulse">
+                                            <div className="w-full h-full bg-green-400 rounded-full animate-ping"></div>
+                                        </div>
                                     )}
                                 </div>
 
-                                <p className="text-xs text-muted-foreground truncate mb-1">
-                                    Project: {conversation.jobTitle}
-                                </p>
+                                {/* Conversation Info */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="font-semibold text-foreground truncate text-base">
+                                            {conversation.otherUser.name}
+                                        </span>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            {conversation.lastMessage && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {formatDistanceToNow(conversation.lastMessage.timestamp, { addSuffix: true })}
+                                                </span>
+                                            )}
+                                            {/* Unread Badge */}
+                                            {conversation.unreadCount > 0 && (
+                                                <Badge variant="destructive" className="text-xs px-2.5 py-1 rounded-full font-semibold shadow-sm animate-pulse">
+                                                    {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    </div>
 
-                                {conversation.lastMessage && (
-                                    <p className="text-sm text-muted-foreground truncate">
-                                        {conversation.lastMessage.content}
+                                    <p className="text-sm text-muted-foreground truncate mb-2 font-medium">
+                                        {conversation.jobTitle}
                                     </p>
-                                )}
-                            </div>
 
-                            {/* Unread Badge */}
-                            {conversation.unreadCount > 0 && (
-                                <Badge variant="destructive" className="text-xs px-2 py-1 ml-2">
-                                    {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
-                                </Badge>
-                            )}
+                                    {conversation.lastMessage && (
+                                        <p className={`text-sm truncate leading-relaxed ${conversation.unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                                            {conversation.lastMessage.content}
+                                        </p>
+                                    )}
+
+                                    {/* Show if no messages yet */}
+                                    {!conversation.lastMessage && (
+                                        <p className="text-xs text-muted-foreground/60 italic">
+                                            No messages yet
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
-        </ScrollArea>
+                    ))}
+                </div>
+            </ScrollArea>
+        </div>
     );
 };

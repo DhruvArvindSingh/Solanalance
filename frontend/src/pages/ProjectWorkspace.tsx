@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RatingModal } from "@/components/RatingModal";
+import { VerifyFundsButton } from "@/components/VerifyFundsButton";
 import { useMessagingStore } from "@/stores/messagingStore";
 import {
     ArrowLeft,
@@ -57,9 +58,15 @@ interface Project {
     status: string;
     started_at: string;
     job: {
+        id: string;
         title: string;
         description: string;
         total_payment: number;
+        skills_required: string[];
+        experience_level: string;
+        duration: string;
+        created_at: string;
+        status: string;
     };
     staking: {
         total_staked: number;
@@ -349,11 +356,95 @@ export default function ProjectWorkspace() {
 
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-4xl font-bold mb-2">{project.job.title}</h1>
-                    <p className="text-muted-foreground">
-                        Started {formatDistanceToNow(new Date(project.started_at))} ago
-                    </p>
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <h1 className="text-4xl font-bold mb-2">{project.job.title}</h1>
+                            <p className="text-muted-foreground">
+                                Started {formatDistanceToNow(new Date(project.started_at))} ago
+                            </p>
+                        </div>
+                        {/* Verify Funds Button for Freelancers on Active Jobs */}
+                        {!isRecruiter && project.status === "active" && (
+                            <div className="ml-4">
+                                <VerifyFundsButton
+                                    jobId={project.job.id}
+                                    jobTitle={project.job.title}
+                                    freelancerWallet={""} // Will be determined by the component
+                                    expectedAmount={project.job.total_payment}
+                                    variant="outline"
+                                    size="default"
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
+
+                {/* Job Details Section */}
+                <Card className="glass border-white/10 mb-8">
+                    <CardHeader>
+                        <CardTitle>Job Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div>
+                                <Label className="text-sm font-medium text-muted-foreground">Job ID</Label>
+                                <p className="font-mono text-sm">{project.job.id}</p>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                                <Badge
+                                    variant="outline"
+                                    className={project.job.status === "active" ? "bg-success/10 text-success border-success/30" : "bg-muted text-muted-foreground border-muted"}
+                                >
+                                    {project.job.status}
+                                </Badge>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-muted-foreground">Total Payment</Label>
+                                <div className="flex items-center space-x-1 text-xl font-bold text-gradient">
+                                    <Coins className="w-5 h-5" />
+                                    <span>{project.job.total_payment.toFixed(2)} SOL</span>
+                                </div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-muted-foreground">Experience Level</Label>
+                                <p className="font-medium">{project.job.experience_level || "Not specified"}</p>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-muted-foreground">Duration</Label>
+                                <p className="font-medium">{project.job.duration || "Not specified"}</p>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-muted-foreground">Posted</Label>
+                                <p className="font-medium">
+                                    {formatDistanceToNow(new Date(project.job.created_at))} ago
+                                </p>
+                            </div>
+                        </div>
+
+                        <Separator />
+
+                        <div>
+                            <Label className="text-sm font-medium text-muted-foreground block mb-2">Description</Label>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                {project.job.description || "No description provided."}
+                            </p>
+                        </div>
+
+                        {project.job.skills_required && project.job.skills_required.length > 0 && (
+                            <div>
+                                <Label className="text-sm font-medium text-muted-foreground block mb-2">Required Skills</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {project.job.skills_required.map((skill, index) => (
+                                        <Badge key={index} variant="secondary" className="text-xs">
+                                            {skill}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Main Content */}
@@ -459,7 +550,8 @@ export default function ProjectWorkspace() {
                                     {/* Submission Section (for Freelancers) */}
                                     {!isRecruiter &&
                                         (milestone.status === "in_progress" ||
-                                            milestone.status === "revision_requested") && (
+                                            milestone.status === "revision_requested") &&
+                                        milestone.stage_number === project.current_stage && (
                                             <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
                                                 <div className="flex items-center space-x-2">
                                                     <Upload className="w-5 h-5 text-primary" />

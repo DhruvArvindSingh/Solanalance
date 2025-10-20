@@ -28,6 +28,8 @@ export interface EscrowVerificationResult {
     milestonesApproved?: boolean[];
     milestonesClaimed?: boolean[];
     error?: string;
+    escrowPDA?: string;
+    totalStaked?: number;
 }
 
 /**
@@ -75,7 +77,32 @@ export async function fundJob(
         const totalAmount = milestones.reduce((a, b) => a + b, 0);
 
         const program = getProgram(wallet);
-        const [escrowPDA] = deriveEscrowPDA(wallet.publicKey, jobId);
+        const [escrowPDA] = await deriveEscrowPDA(wallet.publicKey, jobId);
+
+        // Check if escrow already exists
+        console.log("Checking if escrow already exists...");
+        const existingAccount = await connection.getAccountInfo(escrowPDA);
+        if (existingAccount) {
+            console.log("✓ Escrow already exists (from previous successful transaction)");
+            // Verify it has the correct data
+            try {
+                const escrowData = await (program.account as any).escrow.fetch(escrowPDA);
+                const escrowBalance = await connection.getBalance(escrowPDA);
+                const stakedSOL = lamportsToSol(escrowBalance);
+
+                return {
+                    success: true,
+                    txSignature: "already-created",
+                    escrowPDA: escrowPDA.toBase58(),
+                    message: `Escrow already exists with ${stakedSOL.toFixed(4)} SOL staked`,
+                };
+            } catch (fetchError) {
+                return {
+                    success: false,
+                    error: `Escrow account exists but cannot be read. It may be corrupted. PDA: ${escrowPDA.toBase58()}`,
+                };
+            }
+        }
 
         // Check if recruiter has sufficient balance
         const balance = await connection.getBalance(wallet.publicKey);
@@ -95,19 +122,52 @@ export async function fundJob(
         // Convert SOL amounts to lamports
         const milestoneAmounts = milestones.map(sol => solToLamports(sol));
 
-        // Execute transaction: Creates PDA + Stakes full amount (atomic operation)
-        const tx = await program.methods
-            .createJobEscrow(
-                jobId,
-                new PublicKey(freelancerWallet),
-                milestoneAmounts as any
-            )
-            .accounts({
-                escrow: escrowPDA,
-                recruiter: wallet.publicKey,
-                systemProgram: anchor.web3.SystemProgram.programId,
-            })
-            .rpc();
+        let tx: string;
+
+        try {
+            // Execute transaction: Creates PDA + Stakes full amount (atomic operation)
+            tx = await program.methods
+                .createJobEscrow(
+                    jobId,
+                    new PublicKey(freelancerWallet),
+                    milestoneAmounts as any
+                )
+                .accounts({
+                    escrow: escrowPDA,
+                    recruiter: wallet.publicKey,
+                    systemProgram: anchor.web3.SystemProgram.programId,
+                })
+                .rpc();
+
+            console.log("Transaction sent:", tx);
+        } catch (rpcError: any) {
+            // Check if error is because account already exists
+            if (rpcError.message?.includes("already in use") ||
+                rpcError.message?.includes("already been processed")) {
+                console.log("Transaction may have succeeded in a previous attempt, checking...");
+
+                // Wait a bit for blockchain to update
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Check if escrow was actually created
+                const checkAccount = await connection.getAccountInfo(escrowPDA);
+                if (checkAccount) {
+                    console.log("✓ Escrow exists! Previous transaction succeeded.");
+                    const escrowBalance = await connection.getBalance(escrowPDA);
+                    const stakedSOL = lamportsToSol(escrowBalance);
+
+                    return {
+                        success: true,
+                        txSignature: "already-created",
+                        escrowPDA: escrowPDA.toBase58(),
+                        message: `Escrow created successfully with ${stakedSOL.toFixed(4)} SOL`,
+                    };
+                }
+            }
+
+            // Re-throw if it's a different error
+            throw rpcError;
+        }
 
         console.log("Transaction successful:", tx);
 
@@ -197,7 +257,7 @@ export async function approveMilestone(
         }
 
         const program = getProgram(wallet);
-        const [escrowPDA] = deriveEscrowPDA(wallet.publicKey, jobId);
+        const [escrowPDA] = await deriveEscrowPDA(wallet.publicKey, jobId);
 
         const tx = await program.methods
             .approveMilestone(milestoneIndex)
@@ -253,7 +313,7 @@ export async function claimMilestone(
         }
 
         const program = getProgram(wallet);
-        const [escrowPDA] = deriveEscrowPDA(
+        const [escrowPDA] = await deriveEscrowPDA(
             new PublicKey(recruiterWallet),
             jobId
         );
@@ -368,7 +428,7 @@ export async function cancelJob(
         }
 
         const program = getProgram(wallet);
-        const [escrowPDA] = deriveEscrowPDA(wallet.publicKey, jobId);
+        const [escrowPDA] = await deriveEscrowPDA(wallet.publicKey, jobId);
 
         const tx = await program.methods
             .cancelJob()
@@ -434,6 +494,110 @@ export async function getMilestoneStatus(
     } catch (error) {
         console.error("Error getting milestone status:", error);
         return null;
+    }
+}
+
+/**
+ * Verify Escrow Funds - Check if escrow exists and has correct funds staked
+ * 
+ * Use this to verify that funds are properly locked on-chain for a job
+ * 
+ * @param wallet - Connected wallet adapter instance (recruiter)
+ * @param jobId - Job ID from database
+ * @param expectedFreelancer - Expected freelancer wallet address
+ * @param expectedAmount - Expected total amount in SOL
+ * @returns Verification result with escrow details
+ */
+export async function verifyEscrowFunds(
+    wallet: any,
+    jobId: string,
+    expectedFreelancer?: string,
+    expectedAmount?: number
+): Promise<EscrowVerificationResult> {
+    try {
+        if (!wallet.publicKey) {
+            return { verified: false, error: "Wallet not connected" };
+        }
+
+        const [escrowPDA] = await deriveEscrowPDA(wallet.publicKey, jobId);
+
+        console.log("Verifying escrow funds...");
+        console.log(`Escrow PDA: ${escrowPDA.toBase58()}`);
+
+        // Check if escrow account exists
+        const escrowAccount = await connection.getAccountInfo(escrowPDA);
+
+        if (!escrowAccount) {
+            return {
+                verified: false,
+                error: "Escrow account does not exist. Funds have not been staked yet.",
+                escrowPDA: escrowPDA.toBase58()
+            };
+        }
+
+        console.log("✓ Escrow account exists");
+
+        // Fetch escrow data
+        const program = getProgram(wallet);
+        const escrowData = await (program.account as any).escrow.fetch(escrowPDA);
+
+        // Get escrow balance
+        const escrowBalance = await connection.getBalance(escrowPDA);
+        const stakedSOL = lamportsToSol(escrowBalance);
+
+        console.log(`✓ Escrow balance: ${stakedSOL.toFixed(4)} SOL`);
+
+        // Verify freelancer matches (if provided)
+        if (expectedFreelancer) {
+            const freelancerMatch = escrowData.freelancer.toBase58() === expectedFreelancer;
+            if (!freelancerMatch) {
+                return {
+                    verified: false,
+                    error: `Freelancer mismatch. Expected: ${expectedFreelancer}, Found: ${escrowData.freelancer.toBase58()}`,
+                    escrowPDA: escrowPDA.toBase58()
+                };
+            }
+            console.log("✓ Freelancer verified");
+        }
+
+        // Verify amount (if provided)
+        if (expectedAmount) {
+            const tolerance = 0.01; // Allow small difference for rent
+            if (stakedSOL < (expectedAmount - tolerance)) {
+                return {
+                    verified: false,
+                    error: `Insufficient funds staked. Expected: ${expectedAmount} SOL, Found: ${stakedSOL.toFixed(4)} SOL`,
+                    escrowPDA: escrowPDA.toBase58(),
+                    balance: stakedSOL
+                };
+            }
+            console.log("✓ Amount verified");
+        }
+
+        // Calculate total milestone amounts
+        const milestoneAmounts = escrowData.milestoneAmounts.map((bn: any) => lamportsToSol(bn));
+        const totalMilestones = milestoneAmounts.reduce((a: number, b: number) => a + b, 0);
+
+        console.log("✓ All verifications passed");
+
+        return {
+            verified: true,
+            escrowPDA: escrowPDA.toBase58(),
+            recruiter: escrowData.recruiter.toBase58(),
+            freelancer: escrowData.freelancer.toBase58(),
+            balance: stakedSOL,
+            totalStaked: totalMilestones,
+            milestoneAmounts,
+            milestonesApproved: escrowData.milestonesApproved,
+            milestonesClaimed: escrowData.milestonesClaimed
+        };
+
+    } catch (error: any) {
+        console.error("Error verifying escrow funds:", error);
+        return {
+            verified: false,
+            error: error.message || "Failed to verify escrow funds"
+        };
     }
 }
 

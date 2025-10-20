@@ -98,8 +98,7 @@ export default function JobApplicants() {
             if (data) {
                 setJob(data.job);
                 setApplications(data.applications || []);
-                console.log("applications.wallet_address", applications.wallet_address);
-                console.log("applications", data.applications);
+                console.log("Fetched applications:", data.applications);
             }
         } catch (error: any) {
             console.error("Error fetching applications:", error);
@@ -566,6 +565,7 @@ export default function JobApplicants() {
                     jobId={job.id}
                     jobTitle={job.title}
                     freelancerName={selectedApplication.freelancer.full_name}
+                    freelancerId={selectedApplication.freelancer_id}
                     freelancerWallet={selectedApplication.wallet_address || ""}
                     totalPayment={job.total_payment}
                     onSuccess={handleStakingSuccess}
