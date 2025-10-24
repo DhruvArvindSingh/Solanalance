@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Auth Token</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        .container {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        h1 { color: #14f195; margin-top: 0; }
+        button {
+            background: linear-gradient(135deg, #14f195 0%, #9945ff 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 10px 5px;
+        }
+        button:hover { opacity: 0.9; }
+        .info {
+            background: #334155;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            word-break: break-all;
+        }
+        .success { color: #14f195; }
+        .error { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Auth Token Debugger</h1>
+        <p>Use this tool to debug and clear authentication tokens.</p>
+        
+        <div id="tokenInfo" class="info">
+            <strong>Current Token:</strong><br>
+            <span id="tokenValue">Loading...</span>
+        </div>
+        
+        <button onclick="showToken()">Show Token</button>
+        <button onclick="clearToken()">Clear Token</button>
+        <button onclick="validateToken()">Validate Token</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function showToken() {
+            const token = localStorage.getItem('token');
+            const tokenValue = document.getElementById('tokenValue');
+            
+            if (!token) {
+                tokenValue.innerHTML = '<span class="error">No token found</span>';
+                return;
+            }
+            
+            const parts = token.split('.');
+            tokenValue.innerHTML = `
+                <div>Token exists: <span class="success">✓</span></div>
+                <div>Length: ${token.length} characters</div>
+                <div>Parts: ${parts.length} (should be 3 for JWT)</div>
+                <div>Preview: ${token.substring(0, 50)}...</div>
+            `;
+        }
+        
+        function clearToken() {
+            localStorage.removeItem('token');
+            document.getElementById('result').innerHTML = 
+                '<div class="info success">✓ Token cleared successfully! Please login again.</div>';
+            showToken();
+        }
+        
+        function validateToken() {
+            const token = localStorage.getItem('token');
+            const result = document.getElementById('result');
+            
+            if (!token) {
+                result.innerHTML = '<div class="info error">No token found</div>';
+                return;
+            }
+            
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                result.innerHTML = `<div class="info error">Invalid JWT format! Has ${parts.length} parts, expected 3</div>`;
+                return;
+            }
+            
+            try {
+                const payload = JSON.parse(atob(parts[1]));
+                const exp = payload.exp ? new Date(payload.exp * 1000) : null;
+                const now = new Date();
+                
+                result.innerHTML = `
+                    <div class="info">
+                        <strong>Token Payload:</strong><br>
+                        ${JSON.stringify(payload, null, 2)}<br><br>
+                        <strong>Expiration:</strong> ${exp ? exp.toLocaleString() : 'No expiration'}<br>
+                        <strong>Status:</strong> ${exp && exp < now ? '<span class="error">Expired</span>' : '<span class="success">Valid</span>'}
+                    </div>
+                `;
+            } catch (e) {
+                result.innerHTML = `<div class="info error">Error parsing token: ${e.message}</div>`;
+            }
+        }
+        
+        // Auto-show token on load
+        showToken();
+    </script>
+</body>
+</html>

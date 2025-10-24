@@ -29,7 +29,7 @@ export default function RecruiterDashboard() {
     const [stats, setStats] = useState({
         totalJobs: 0,
         openJobs: 0,
-        inProgressJobs: 0,
+        activeJobs: 0,
         completedJobs: 0,
         totalSpent: 0,
     });
@@ -60,7 +60,7 @@ export default function RecruiterDashboard() {
             // Calculate stats
             const totalJobs = jobsWithStats.length;
             const openJobs = jobsWithStats.filter((j) => j.status === "open").length;
-            const inProgressJobs = jobsWithStats.filter((j) => j.status === "in_progress").length;
+            const activeJobs = jobsWithStats.filter((j) => j.status === "active").length;
             const completedJobs = jobsWithStats.filter((j) => j.status === "completed").length;
 
             // Calculate total spent (sum of completed job payments)
@@ -71,7 +71,7 @@ export default function RecruiterDashboard() {
             setStats({
                 totalJobs,
                 openJobs,
-                inProgressJobs,
+                activeJobs,
                 completedJobs,
                 totalSpent,
             });
@@ -87,7 +87,7 @@ export default function RecruiterDashboard() {
         switch (status) {
             case "open":
                 return "bg-success/10 text-success border-success/30";
-            case "in_progress":
+            case "active":
                 return "bg-primary/10 text-primary border-primary/30";
             case "completed":
                 return "bg-muted text-muted-foreground border-muted";
@@ -161,7 +161,7 @@ export default function RecruiterDashboard() {
                         <CardContent>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-3xl font-bold text-primary">{stats.inProgressJobs}</p>
+                                    <p className="text-3xl font-bold text-primary">{stats.activeJobs}</p>
                                 </div>
                                 <Users className="w-8 h-8 text-primary" />
                             </div>
@@ -191,12 +191,12 @@ export default function RecruiterDashboard() {
                             <TabsList className="grid w-full grid-cols-5 mb-6">
                                 <TabsTrigger value="all">All</TabsTrigger>
                                 <TabsTrigger value="open">Open</TabsTrigger>
-                                <TabsTrigger value="in_progress">In Progress</TabsTrigger>
+                                <TabsTrigger value="active">Active</TabsTrigger>
                                 <TabsTrigger value="completed">Completed</TabsTrigger>
                                 <TabsTrigger value="draft">Drafts</TabsTrigger>
                             </TabsList>
 
-                            {["all", "open", "in_progress", "completed", "draft"].map((tab) => {
+                            {["all", "open", "active", "completed", "draft"].map((tab) => {
                                 const filteredJobs =
                                     tab === "all" ? jobs : jobs.filter((j) => j.status === tab);
 
@@ -244,8 +244,8 @@ export default function RecruiterDashboard() {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Show Verify Funds button for in-progress jobs */}
-                                                            {job.status === "in_progress" && (
+                                                            {/* Show Verify Funds button for active jobs */}
+                                                            {job.status === "active" && (
                                                                 <div onClick={(e) => e.stopPropagation()}>
                                                                     <VerifyFundsButton
                                                                         jobId={job.id}

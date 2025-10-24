@@ -23,6 +23,15 @@ export const authenticateToken = async (
             return res.status(401).json({ error: 'Access token required' });
         }
 
+        // Validate token format before verification
+        if (!token || token === 'undefined' || token === 'null' || token.split('.').length !== 3) {
+            console.error('Auth error: Malformed token format', { 
+                tokenPreview: token ? token.substring(0, 20) + '...' : 'empty',
+                path: req.path 
+            });
+            return res.status(401).json({ error: 'Invalid token format' });
+        }
+
         const decoded = jwt.verify(token, JWT_SECRET) as any;
 
         // Get user role from database
@@ -37,7 +46,14 @@ export const authenticateToken = async (
 
         next();
     } catch (error) {
-        console.error('Auth error:', error);
+        if (error instanceof jwt.JsonWebTokenError) {
+            console.error('Auth error: JWT verification failed', { 
+                message: error.message,
+                path: req.path 
+            });
+        } else {
+            console.error('Auth error:', error);
+        }
         return res.status(403).json({ error: 'Invalid or expired token' });
     }
 };

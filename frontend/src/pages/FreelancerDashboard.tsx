@@ -101,7 +101,7 @@ export default function FreelancerDashboard() {
             // Calculate stats
             const totalApplications = (applicationsData || []).length;
             const activeProjects = (projectsData || []).filter(
-                (p) => p.status === "in_progress"
+                (p) => p.status === "active"
             ).length;
             const completedProjects = (projectsData || []).filter(
                 (p) => p.status === "completed"
@@ -343,7 +343,7 @@ export default function FreelancerDashboard() {
 
                                                     <div className="flex items-center space-x-2">
                                                         {/* Show Verify Funds button for active projects */}
-                                                        {(project.status === "active" || project.status === "in_progress") && (
+                                                        {project.status === "active" && (
                                                             <div onClick={(e) => e.stopPropagation()}>
                                                                 <VerifyFundsButton
                                                                     jobId={project.job.id}
@@ -358,7 +358,7 @@ export default function FreelancerDashboard() {
                                                         <Badge
                                                             variant="outline"
                                                             className={
-                                                                project.status === "in_progress"
+                                                                project.status === "active"
                                                                     ? "bg-primary/10 text-primary border-primary/30"
                                                                     : "bg-success/10 text-success border-success/30"
                                                             }

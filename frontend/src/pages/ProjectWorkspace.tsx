@@ -86,10 +86,10 @@ export default function ProjectWorkspace() {
     const [milestones, setMilestones] = useState<Milestone[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Submission state
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submissionDescription, setSubmissionDescription] = useState("");
-    const [submissionLinks, setSubmissionLinks] = useState("");
+    // Submission state - track per milestone
+    const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
+    const [submissionDescriptions, setSubmissionDescriptions] = useState<Record<string, string>>({});
+    const [submissionLinks, setSubmissionLinks] = useState<Record<string, string>>({});
 
     // Review state
     const [isReviewing, setIsReviewing] = useState(false);
@@ -166,35 +166,36 @@ export default function ProjectWorkspace() {
     };
 
     const handleSubmitMilestone = async (milestoneId: string) => {
-        if (!submissionDescription.trim()) {
+        const description = submissionDescriptions[milestoneId] || "";
+        if (!description.trim()) {
             toast.error("Please provide a description of your work");
             return;
         }
 
-        setIsSubmitting(true);
+        setIsSubmitting(prev => ({ ...prev, [milestoneId]: true }));
 
         try {
-            const links = submissionLinks
+            const links = (submissionLinks[milestoneId] || "")
                 .split("\n")
                 .map((l) => l.trim())
                 .filter((l) => l.length > 0);
 
             const { error } = await apiClient.projects.submitMilestone(milestoneId, {
-                submission_description: submissionDescription,
+                submission_description: description,
                 submission_links: links.length > 0 ? links : null,
             });
 
             if (error) throw new Error(error);
 
             toast.success("Milestone submitted for review");
-            setSubmissionDescription("");
-            setSubmissionLinks("");
+            setSubmissionDescriptions(prev => ({ ...prev, [milestoneId]: "" }));
+            setSubmissionLinks(prev => ({ ...prev, [milestoneId]: "" }));
             fetchProjectData();
         } catch (error: any) {
             console.error("Error submitting milestone:", error);
             toast.error("Failed to submit milestone");
         } finally {
-            setIsSubmitting(false);
+            setIsSubmitting(prev => ({ ...prev, [milestoneId]: false }));
         }
     };
 
@@ -300,8 +301,6 @@ export default function ProjectWorkspace() {
         switch (status) {
             case "pending":
                 return "bg-muted text-muted-foreground border-muted";
-            case "in_progress":
-                return "bg-primary/10 text-primary border-primary/30";
             case "submitted":
                 return "bg-warning/10 text-warning border-warning/30";
             case "approved":
@@ -523,18 +522,6 @@ export default function ProjectWorkspace() {
                                         </Badge>
                                     </div>
                                 </CardHeader>
-                                {milestone.status === "in_progress" && !isRecruiter && (
-                                    <CardContent>
-                                        <Button
-                                            onClick={() => {
-                                                sendMessage(project.id, "Hi!!!", project.recruiter_id);
-                                                toast.success("Message sent to recruiter!");
-                                            }}
-                                        >
-                                            Send recruiter 'Hi!!!'
-                                        </Button>
-                                    </CardContent>
-                                )}
                                 <CardContent className="space-y-4">
                                     {/* Payment Info */}
                                     <div className="flex items-center justify-between p-3 bg-gradient-card rounded-lg">
@@ -549,9 +536,10 @@ export default function ProjectWorkspace() {
 
                                     {/* Submission Section (for Freelancers) */}
                                     {!isRecruiter &&
-                                        (milestone.status === "in_progress" ||
+                                        (milestone.status === "pending" ||
                                             milestone.status === "revision_requested") &&
-                                        milestone.stage_number === project.current_stage && (
+                                        !milestone.payment_released &&
+                                        project.status === "active" && (
                                             <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
                                                 <div className="flex items-center space-x-2">
                                                     <Upload className="w-5 h-5 text-primary" />
@@ -570,27 +558,33 @@ export default function ProjectWorkspace() {
                                                     )}
 
                                                 <div className="space-y-2">
-                                                    <Label htmlFor="description">
+                                                    <Label htmlFor={`description-${milestone.id}`}>
                                                         Describe your work *
                                                     </Label>
                                                     <Textarea
-                                                        id="description"
+                                                        id={`description-${milestone.id}`}
                                                         placeholder="Explain what you've completed for this stage..."
-                                                        value={submissionDescription}
+                                                        value={submissionDescriptions[milestone.id] || ""}
                                                         onChange={(e) =>
-                                                            setSubmissionDescription(e.target.value)
+                                                            setSubmissionDescriptions(prev => ({
+                                                                ...prev,
+                                                                [milestone.id]: e.target.value
+                                                            }))
                                                         }
                                                         rows={4}
                                                     />
                                                 </div>
 
                                                 <div className="space-y-2">
-                                                    <Label htmlFor="links">Links (Optional)</Label>
+                                                    <Label htmlFor={`links-${milestone.id}`}>Links (Optional)</Label>
                                                     <Textarea
-                                                        id="links"
+                                                        id={`links-${milestone.id}`}
                                                         placeholder="GitHub repo, demo link, etc. (one per line)"
-                                                        value={submissionLinks}
-                                                        onChange={(e) => setSubmissionLinks(e.target.value)}
+                                                        value={submissionLinks[milestone.id] || ""}
+                                                        onChange={(e) => setSubmissionLinks(prev => ({
+                                                            ...prev,
+                                                            [milestone.id]: e.target.value
+                                                        }))}
                                                         rows={3}
                                                         className="font-mono text-sm"
                                                     />
@@ -598,10 +592,10 @@ export default function ProjectWorkspace() {
 
                                                 <Button
                                                     onClick={() => handleSubmitMilestone(milestone.id)}
-                                                    disabled={isSubmitting || !submissionDescription.trim()}
+                                                    disabled={isSubmitting[milestone.id] || !(submissionDescriptions[milestone.id] || "").trim()}
                                                     className="w-full bg-gradient-solana"
                                                 >
-                                                    {isSubmitting ? (
+                                                    {isSubmitting[milestone.id] ? (
                                                         <>
                                                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                                             Submitting...

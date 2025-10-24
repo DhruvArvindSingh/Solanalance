@@ -31,6 +31,16 @@ class ApiClient {
         const url = `${this.baseURL}${endpoint}`;
         const token = this.getToken(); // Get fresh token from localStorage
 
+        // Validate token format before sending (JWT should have 3 parts)
+        if (token && token.split('.').length !== 3) {
+            console.warn('Invalid token format detected, clearing token');
+            this.setToken(null);
+            return {
+                data: null,
+                error: 'Invalid authentication token. Please login again.'
+            };
+        }
+
         // Check if body is FormData
         const isFormData = options.body instanceof FormData;
 
@@ -53,6 +63,12 @@ class ApiClient {
             const result = await response.json();
 
             if (!response.ok) {
+                // Clear token if authentication fails
+                if (response.status === 401 || response.status === 403) {
+                    console.warn('Authentication failed, clearing token');
+                    this.setToken(null);
+                }
+                
                 return {
                     data: null,
                     error: result.error || 'An error occurred'
@@ -121,7 +137,8 @@ class ApiClient {
                 email: options.email,
                 password: options.password,
                 fullName: options.options?.data?.full_name || '',
-                role: 'freelancer' // default role
+                role: 'freelancer', // default role
+                walletAddress: '' // will be updated later
             };
             return this.auth.register(data);
         },

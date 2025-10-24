@@ -184,15 +184,13 @@ router.put('/milestone/:id/submit', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        if (milestone.status !== 'in_progress' && milestone.status !== 'revision_requested') {
+        if (milestone.status !== 'pending' && milestone.status !== 'revision_requested') {
             return res.status(400).json({ error: 'Milestone cannot be submitted in current state' });
         }
 
-        // Only allow submission of the current stage milestone
-        if (milestone.stageNumber !== milestone.project.currentStage) {
-            return res.status(400).json({
-                error: `Can only submit milestone for current stage (${milestone.project.currentStage}). This milestone is for stage ${milestone.stageNumber}.`
-            });
+        // Check if project is active
+        if (milestone.project.status !== 'active') {
+            return res.status(400).json({ error: 'Project is not active' });
         }
 
         const links = submissionLinks
@@ -304,16 +302,7 @@ router.put('/milestone/:id/review', authenticateToken, async (req, res) => {
                     }
                 });
 
-                // Set next milestone to in_progress
-                await req.prisma.milestone.updateMany({
-                    where: {
-                        projectId: milestone.projectId,
-                        stageNumber: milestone.stageNumber + 1
-                    },
-                    data: {
-                        status: 'in_progress'
-                    }
-                });
+                // Next milestone remains pending - freelancer can submit any pending milestone
             } else {
                 // Project completed
                 await req.prisma.project.update({

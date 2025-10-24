@@ -38,7 +38,7 @@ router.post('/', authenticateToken, requireRole('recruiter'), async (req, res) =
                 recruiterId: req.user!.id,
                 freelancerId,
                 currentStage: 1,
-                status: 'in_progress'
+                status: 'active'
             }
         });
 
@@ -65,7 +65,7 @@ router.post('/', authenticateToken, requireRole('recruiter'), async (req, res) =
                 projectId: project.id,
                 stageId: stage.id,
                 stageNumber: stage.stageNumber,
-                status: stage.stageNumber === 1 ? 'in_progress' : 'pending',
+                status: 'pending',
                 paymentAmount: stage.payment
             }));
 
@@ -102,7 +102,7 @@ router.post('/', authenticateToken, requireRole('recruiter'), async (req, res) =
         await req.prisma.job.update({
             where: { id: jobId },
             data: {
-                status: 'in_progress',
+                status: 'active',
                 selectedFreelancerId: freelancerId
             }
         });

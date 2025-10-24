@@ -570,7 +570,7 @@ export type Database = {
         Enums: {
             app_role: "recruiter" | "freelancer"
             experience_level: "beginner" | "intermediate" | "expert"
-            job_status: "draft" | "open" | "in_progress" | "completed" | "cancelled"
+            job_status: "draft" | "open" | "active" | "completed" | "cancelled"
             project_duration: "short_term" | "medium_term" | "long_term"
             rating_tier: "gold" | "silver" | "bronze" | "iron"
         }
@@ -685,7 +685,7 @@ export const Constants = {
         Enums: {
             app_role: ["recruiter", "freelancer"],
             experience_level: ["beginner", "intermediate", "expert"],
-            job_status: ["draft", "open", "in_progress", "completed", "cancelled"],
+            job_status: ["draft", "open", "active", "completed", "cancelled"],
             project_duration: ["short_term", "medium_term", "long_term"],
             rating_tier: ["gold", "silver", "bronze", "iron"],
         },

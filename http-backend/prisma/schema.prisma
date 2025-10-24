@@ -28,7 +28,7 @@ enum AppRole {
 enum JobStatus {
   draft
   open
-  in_progress
+  active
   completed
   cancelled
 

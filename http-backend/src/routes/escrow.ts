@@ -95,7 +95,7 @@ router.post('/verify', authenticateToken, async (req, res) => {
                     projectId: project.id,
                     stageId: stage.id,
                     stageNumber: stage.stageNumber,
-                    status: stage.stageNumber === 1 ? 'in_progress' : 'pending',
+                    status: 'pending',
                     paymentAmount: stage.payment
                 }));
 
@@ -147,7 +147,7 @@ router.post('/verify', authenticateToken, async (req, res) => {
         await req.prisma.job.update({
             where: { id: jobId },
             data: {
-                status: 'in_progress',
+                status: 'active',
                 selectedFreelancerId: freelancerId
             }
         });
