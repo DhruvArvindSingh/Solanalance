@@ -90,6 +90,8 @@ export default function ProjectWorkspace() {
     const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
     const [submissionDescriptions, setSubmissionDescriptions] = useState<Record<string, string>>({});
     const [submissionLinks, setSubmissionLinks] = useState<Record<string, string>>({});
+    const [submissionFiles, setSubmissionFiles] = useState<Record<string, File[]>>({});
+    const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
 
     // Review state
     const [isReviewing, setIsReviewing] = useState(false);
@@ -165,6 +167,70 @@ export default function ProjectWorkspace() {
         }
     };
 
+    const handleFileSelect = (milestoneId: string, files: FileList | null) => {
+        if (!files || files.length === 0) return;
+
+        const fileArray = Array.from(files);
+        const maxSize = 10 * 1024 * 1024; // 10MB per file
+        const maxFiles = 5;
+
+        // Validate file sizes
+        const oversizedFiles = fileArray.filter(f => f.size > maxSize);
+        if (oversizedFiles.length > 0) {
+            toast.error(`Some files exceed 10MB limit: ${oversizedFiles.map(f => f.name).join(", ")}`);
+            return;
+        }
+
+        // Validate total number of files
+        const currentFiles = submissionFiles[milestoneId] || [];
+        if (currentFiles.length + fileArray.length > maxFiles) {
+            toast.error(`Maximum ${maxFiles} files allowed`);
+            return;
+        }
+
+        setSubmissionFiles(prev => ({
+            ...prev,
+            [milestoneId]: [...currentFiles, ...fileArray]
+        }));
+    };
+
+    const handleRemoveFile = (milestoneId: string, index: number) => {
+        setSubmissionFiles(prev => ({
+            ...prev,
+            [milestoneId]: (prev[milestoneId] || []).filter((_, i) => i !== index)
+        }));
+    };
+
+    const uploadFilesToS3 = async (milestoneId: string, files: File[]): Promise<string[]> => {
+        if (files.length === 0) return [];
+
+        setUploadingFiles(prev => ({ ...prev, [milestoneId]: true }));
+
+        try {
+            const uploadedUrls: string[] = [];
+
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('type', 'milestone');
+
+                const { data, error } = await apiClient.upload.uploadFile(formData);
+
+                if (error) throw new Error(error);
+                if (data?.url) {
+                    uploadedUrls.push(data.url);
+                }
+            }
+
+            return uploadedUrls;
+        } catch (error: any) {
+            console.error('Error uploading files:', error);
+            throw error;
+        } finally {
+            setUploadingFiles(prev => ({ ...prev, [milestoneId]: false }));
+        }
+    };
+
     const handleSubmitMilestone = async (milestoneId: string) => {
         const description = submissionDescriptions[milestoneId] || "";
         if (!description.trim()) {
@@ -180,9 +246,20 @@ export default function ProjectWorkspace() {
                 .map((l) => l.trim())
                 .filter((l) => l.length > 0);
 
+            // Upload files if any
+            const files = submissionFiles[milestoneId] || [];
+            let fileUrls: string[] = [];
+
+            if (files.length > 0) {
+                toast.info(`Uploading ${files.length} file(s)...`);
+                fileUrls = await uploadFilesToS3(milestoneId, files);
+                toast.success(`${fileUrls.length} file(s) uploaded successfully`);
+            }
+
             const { error } = await apiClient.projects.submitMilestone(milestoneId, {
                 submission_description: description,
                 submission_links: links.length > 0 ? links : null,
+                submission_files: fileUrls.length > 0 ? fileUrls : null,
             });
 
             if (error) throw new Error(error);
@@ -190,6 +267,7 @@ export default function ProjectWorkspace() {
             toast.success("Milestone submitted for review");
             setSubmissionDescriptions(prev => ({ ...prev, [milestoneId]: "" }));
             setSubmissionLinks(prev => ({ ...prev, [milestoneId]: "" }));
+            setSubmissionFiles(prev => ({ ...prev, [milestoneId]: [] }));
             fetchProjectData();
         } catch (error: any) {
             console.error("Error submitting milestone:", error);
@@ -590,12 +668,69 @@ export default function ProjectWorkspace() {
                                                     />
                                                 </div>
 
+                                                {/* File Upload Section */}
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`files-${milestone.id}`}>
+                                                        Files (Optional)
+                                                        <span className="text-xs text-muted-foreground ml-2">
+                                                            Max 5 files, 10MB each
+                                                        </span>
+                                                    </Label>
+                                                    <div className="space-y-2">
+                                                        <Input
+                                                            id={`files-${milestone.id}`}
+                                                            type="file"
+                                                            multiple
+                                                            onChange={(e) => handleFileSelect(milestone.id, e.target.files)}
+                                                            className="cursor-pointer"
+                                                            accept=".pdf,.doc,.docx,.txt,.zip,.png,.jpg,.jpeg,.gif"
+                                                        />
+                                                        
+                                                        {/* Display selected files */}
+                                                        {(submissionFiles[milestone.id] || []).length > 0 && (
+                                                            <div className="space-y-1 p-2 bg-muted/50 rounded-md">
+                                                                {(submissionFiles[milestone.id] || []).map((file, index) => (
+                                                                    <div
+                                                                        key={index}
+                                                                        className="flex items-center justify-between p-2 bg-background rounded text-sm"
+                                                                    >
+                                                                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                                                            <Upload className="w-4 h-4 text-primary flex-shrink-0" />
+                                                                            <span className="truncate">{file.name}</span>
+                                                                            <span className="text-xs text-muted-foreground flex-shrink-0">
+                                                                                ({(file.size / 1024).toFixed(1)} KB)
+                                                                            </span>
+                                                                        </div>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            onClick={() => handleRemoveFile(milestone.id, index)}
+                                                                            className="h-6 w-6 p-0 flex-shrink-0"
+                                                                        >
+                                                                            <XCircle className="w-4 h-4 text-destructive" />
+                                                                        </Button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
                                                 <Button
                                                     onClick={() => handleSubmitMilestone(milestone.id)}
-                                                    disabled={isSubmitting[milestone.id] || !(submissionDescriptions[milestone.id] || "").trim()}
+                                                    disabled={
+                                                        isSubmitting[milestone.id] || 
+                                                        uploadingFiles[milestone.id] ||
+                                                        !(submissionDescriptions[milestone.id] || "").trim()
+                                                    }
                                                     className="w-full bg-gradient-solana"
                                                 >
-                                                    {isSubmitting[milestone.id] ? (
+                                                    {uploadingFiles[milestone.id] ? (
+                                                        <>
+                                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                            Uploading files...
+                                                        </>
+                                                    ) : isSubmitting[milestone.id] ? (
                                                         <>
                                                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                                             Submitting...
@@ -622,6 +757,27 @@ export default function ProjectWorkspace() {
                                                 <p className="text-sm text-muted-foreground whitespace-pre-wrap mb-3">
                                                     {milestone.submission_description}
                                                 </p>
+                                                {milestone.submission_files &&
+                                                    milestone.submission_files.length > 0 && (
+                                                        <div className="space-y-1 mb-3">
+                                                            <p className="text-sm font-medium">Uploaded Files:</p>
+                                                            {milestone.submission_files.map((fileUrl, idx) => {
+                                                                const fileName = fileUrl.split('/').pop() || fileUrl;
+                                                                return (
+                                                                    <a
+                                                                        key={idx}
+                                                                        href={fileUrl}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="flex items-center space-x-2 text-sm text-primary hover:underline p-2 bg-muted/50 rounded"
+                                                                    >
+                                                                        <Download className="w-4 h-4 flex-shrink-0" />
+                                                                        <span className="truncate">{fileName}</span>
+                                                                    </a>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
                                                 {milestone.submission_links &&
                                                     milestone.submission_links.length > 0 && (
                                                         <div className="space-y-1">

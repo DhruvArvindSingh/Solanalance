@@ -365,6 +365,23 @@ class ApiClient {
         },
     };
 
+    // Upload endpoints
+    upload = {
+        uploadFile: async (formData: FormData) => {
+            return this.request('/upload', {
+                method: 'POST',
+                body: formData,
+            });
+        },
+
+        uploadMultiple: async (formData: FormData) => {
+            return this.request('/upload/multiple', {
+                method: 'POST',
+                body: formData,
+            });
+        },
+    };
+
     // Conversation endpoints
     conversations = {
         getAll: async (params?: any) => {
