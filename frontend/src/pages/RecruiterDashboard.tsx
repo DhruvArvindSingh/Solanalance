@@ -19,6 +19,7 @@ interface JobWithStats {
     total_payment: number;
     created_at: string;
     applicants_count: number;
+    project_id?: string; // For active jobs
 }
 
 export default function RecruiterDashboard() {
@@ -26,6 +27,7 @@ export default function RecruiterDashboard() {
     const navigate = useNavigate();
     const [jobs, setJobs] = useState<JobWithStats[]>([]);
     const [loading, setLoading] = useState(true);
+    const [jobProjectMap, setJobProjectMap] = useState<Record<string, string>>({});
     const [stats, setStats] = useState({
         totalJobs: 0,
         openJobs: 0,
@@ -56,6 +58,18 @@ export default function RecruiterDashboard() {
 
             const jobsWithStats = jobsData || [];
             setJobs(jobsWithStats);
+
+            // Fetch active projects to map jobs to projects
+            const { data: projectsData, error: projectsError } = await apiClient.projects.getMyProjects();
+            if (!projectsError && projectsData) {
+                const projectMap: Record<string, string> = {};
+                projectsData.forEach((project: any) => {
+                    if (project.status === 'active') {
+                        projectMap[project.job_id] = project.id;
+                    }
+                });
+                setJobProjectMap(projectMap);
+            }
 
             // Calculate stats
             const totalJobs = jobsWithStats.length;
@@ -217,7 +231,10 @@ export default function RecruiterDashboard() {
                                                     key={job.id}
                                                     className="p-4 rounded-lg glass border border-white/10 hover:border-white/20 transition-colors cursor-pointer"
                                                     onClick={() => {
-                                                        if (job.status === "open" && job.applicants_count > 0) {
+                                                        // For active jobs, navigate to project workspace
+                                                        if (job.status === "active" && jobProjectMap[job.id]) {
+                                                            navigate(`/projects/${jobProjectMap[job.id]}`);
+                                                        } else if (job.status === "open" && job.applicants_count > 0) {
                                                             navigate(`/jobs/${job.id}/applicants`);
                                                         } else {
                                                             navigate(`/jobs/${job.id}`);

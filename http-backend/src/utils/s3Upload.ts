@@ -144,3 +144,51 @@ export const getProfilePictureFromS3 = async (userId: string): Promise<string | 
         return null;
     }
 };
+
+export const uploadMilestoneFilesToS3 = async (
+    milestoneId: string,
+    projectId: string,
+    userId: string,
+    files: any[]
+): Promise<string[]> => {
+    const uploadedUrls: string[] = [];
+
+    // Validate file sizes
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB per file
+
+    for (const file of files) {
+        if (file.size > MAX_FILE_SIZE) {
+            throw new Error(`File ${file.originalname} exceeds 10 MB limit. File size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+        }
+
+        // Determine file extension
+        const fileExtension = file.originalname.split('.').pop() || 'bin';
+        const timestamp = Date.now();
+        const fileName = `${timestamp}_${file.originalname}`;
+        const s3Key = `MILESTONES/${projectId}/${milestoneId}/${fileName}`;
+
+        const params = {
+            Bucket: process.env.AWS_BUCKET_NAME || 'solanalance-uploads',
+            Key: s3Key,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+            Metadata: {
+                userId,
+                projectId,
+                milestoneId,
+                uploadedAt: new Date().toISOString(),
+            },
+        };
+
+        try {
+            const result = await s3.upload(params).promise();
+            console.log(`Milestone file uploaded successfully: ${s3Key}`);
+            uploadedUrls.push(result.Location);
+        } catch (error) {
+            console.error('S3 milestone file upload error:', error);
+            throw new Error(`Failed to upload file ${file.originalname} to S3: ${(error as Error).message}`);
+        }
+    }
+
+    return uploadedUrls;
+};

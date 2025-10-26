@@ -267,10 +267,10 @@ class ApiClient {
             return this.request(`/projects/${id}`);
         },
 
-        submitMilestone: async (milestoneId: string, data: any) => {
+        submitMilestone: async (milestoneId: string, data: FormData) => {
             return this.request(`/projects/milestone/${milestoneId}/submit`, {
                 method: 'PUT',
-                body: JSON.stringify(data),
+                body: data,
             });
         },
 

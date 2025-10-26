@@ -98,6 +98,19 @@ router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
+        // First, fetch basic job info to check status
+        const basicJob = await req.prisma.job.findUnique({
+            where: { id },
+            select: { status: true }
+        });
+
+        if (!basicJob) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+
+        const isActive = basicJob.status === 'active';
+
+        // Now fetch full job data with conditional includes
         const job = await req.prisma.job.findUnique({
             where: { id },
             include: {
@@ -113,6 +126,34 @@ router.get('/:id', async (req, res) => {
                         stageNumber: 'asc'
                     }
                 },
+                selectedFreelancer: isActive ? {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        avatarUrl: true,
+                        bio: true,
+                        skills: true,
+                        hourlyRate: true
+                    }
+                } : false,
+                projects: isActive ? {
+                    include: {
+                        milestones: {
+                            orderBy: {
+                                stageNumber: 'asc'
+                            },
+                            include: {
+                                stage: {
+                                    select: {
+                                        name: true,
+                                        description: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } : false,
                 _count: {
                     select: {
                         applications: true
@@ -135,7 +176,7 @@ router.get('/:id', async (req, res) => {
             }
         });
 
-        const response = {
+        const response: any = {
             id: job.id,
             title: job.title,
             description: job.description,
@@ -153,7 +194,7 @@ router.get('/:id', async (req, res) => {
                 company_name: job.recruiter.companyName,
                 avatar_url: job.recruiter.avatarUrl
             },
-            stages: job.jobStages.map(stage => ({
+            stages: job.jobStages.map((stage: any) => ({
                 id: stage.id,
                 name: stage.name,
                 description: stage.description,
@@ -162,6 +203,40 @@ router.get('/:id', async (req, res) => {
             })),
             applicants_count: job._count.applications
         };
+
+        // Add selected freelancer and milestone data if job is active
+        if (job.status === 'active' && job.selectedFreelancer) {
+            response.selected_freelancer = {
+                id: job.selectedFreelancer.id,
+                full_name: job.selectedFreelancer.fullName,
+                email: job.selectedFreelancer.email,
+                avatar_url: job.selectedFreelancer.avatarUrl,
+                bio: job.selectedFreelancer.bio,
+                skills: job.selectedFreelancer.skills,
+                hourly_rate: job.selectedFreelancer.hourlyRate ? parseFloat(job.selectedFreelancer.hourlyRate.toString()) : null
+            };
+
+            // Add milestone submissions if project exists
+            if (job.projects && job.projects.length > 0) {
+                const project: any = job.projects[0];
+                response.milestones = project.milestones.map((milestone: any) => ({
+                    id: milestone.id,
+                    stage_number: milestone.stageNumber,
+                    stage_name: milestone.stage.name,
+                    stage_description: milestone.stage.description,
+                    status: milestone.status,
+                    payment_amount: parseFloat(milestone.paymentAmount.toString()),
+                    payment_released: milestone.paymentReleased,
+                    submission_description: milestone.submissionDescription,
+                    submission_files: milestone.submissionFiles,
+                    submission_links: milestone.submissionLinks,
+                    submitted_at: milestone.submittedAt,
+                    reviewed_at: milestone.reviewedAt,
+                    reviewer_comments: milestone.reviewerComments,
+                    created_at: milestone.createdAt
+                }));
+            }
+        }
 
         res.json(response);
     } catch (error) {

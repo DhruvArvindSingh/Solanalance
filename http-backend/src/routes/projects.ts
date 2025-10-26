@@ -1,7 +1,18 @@
 import express from 'express';
+import multer from 'multer';
 import { authenticateToken } from '../middleware/auth';
+import { uploadMilestoneFilesToS3 } from '../utils/s3Upload';
 
 const router = express.Router();
+
+// Configure multer for milestone file uploads
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB per file
+        files: 5, // Maximum 5 files
+    },
+});
 
 // Get user's projects
 router.get('/my-projects', authenticateToken, async (req, res) => {
@@ -164,10 +175,15 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Submit milestone (freelancers only)
-router.put('/milestone/:id/submit', authenticateToken, async (req, res) => {
+router.put('/milestone/:id/submit', authenticateToken, upload.array('files', 5), async (req, res) => {
     try {
         const { id } = req.params;
-        const { submissionDescription, submissionLinks } = req.body;
+        const { submission_description, submission_links } = req.body;
+        const files = req.files as Express.Multer.File[];
+
+        if (!submission_description || !submission_description.trim()) {
+            return res.status(400).json({ error: 'Submission description is required' });
+        }
 
         const milestone = await req.prisma.milestone.findUnique({
             where: { id },
@@ -184,7 +200,7 @@ router.put('/milestone/:id/submit', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        if (milestone.status !== 'pending' && milestone.status !== 'revision_requested') {
+        if (milestone.status !== 'pending' && milestone.status !== 'revision_requested' && milestone.status !== 'submitted') {
             return res.status(400).json({ error: 'Milestone cannot be submitted in current state' });
         }
 
@@ -193,16 +209,42 @@ router.put('/milestone/:id/submit', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Project is not active' });
         }
 
-        const links = submissionLinks
-            ? submissionLinks.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
-            : [];
+        // Parse submission links
+        let links: string[] = [];
+        if (submission_links) {
+            try {
+                // Try parsing as JSON array first
+                links = JSON.parse(submission_links);
+            } catch {
+                // Fallback to splitting by newlines
+                links = submission_links.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+            }
+        }
 
+        // Upload files to S3 if any
+        let fileUrls: string[] = [];
+        if (files && files.length > 0) {
+            try {
+                fileUrls = await uploadMilestoneFilesToS3(
+                    id,
+                    milestone.projectId,
+                    req.user!.id,
+                    files
+                );
+            } catch (error: any) {
+                console.error('File upload error:', error);
+                return res.status(500).json({ error: error.message || 'Failed to upload files' });
+            }
+        }
+
+        // Update milestone with submission data
         await req.prisma.milestone.update({
             where: { id },
             data: {
                 status: 'submitted',
-                submissionDescription,
-                submissionLinks: links,
+                submissionDescription: submission_description,
+                submissionLinks: links.length > 0 ? links : [],
+                submissionFiles: fileUrls.length > 0 ? fileUrls : [],
                 submittedAt: new Date()
             }
         });

@@ -91,7 +91,7 @@ export default function ProjectWorkspace() {
     const [submissionDescriptions, setSubmissionDescriptions] = useState<Record<string, string>>({});
     const [submissionLinks, setSubmissionLinks] = useState<Record<string, string>>({});
     const [submissionFiles, setSubmissionFiles] = useState<Record<string, File[]>>({});
-    const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
+    const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
 
     // Review state
     const [isReviewing, setIsReviewing] = useState(false);
@@ -201,36 +201,6 @@ export default function ProjectWorkspace() {
         }));
     };
 
-    const uploadFilesToS3 = async (milestoneId: string, files: File[]): Promise<string[]> => {
-        if (files.length === 0) return [];
-
-        setUploadingFiles(prev => ({ ...prev, [milestoneId]: true }));
-
-        try {
-            const uploadedUrls: string[] = [];
-
-            for (const file of files) {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('type', 'milestone');
-
-                const { data, error } = await apiClient.upload.uploadFile(formData);
-
-                if (error) throw new Error(error);
-                if (data?.url) {
-                    uploadedUrls.push(data.url);
-                }
-            }
-
-            return uploadedUrls;
-        } catch (error: any) {
-            console.error('Error uploading files:', error);
-            throw error;
-        } finally {
-            setUploadingFiles(prev => ({ ...prev, [milestoneId]: false }));
-        }
-    };
-
     const handleSubmitMilestone = async (milestoneId: string) => {
         const description = submissionDescriptions[milestoneId] || "";
         if (!description.trim()) {
@@ -246,21 +216,25 @@ export default function ProjectWorkspace() {
                 .map((l) => l.trim())
                 .filter((l) => l.length > 0);
 
-            // Upload files if any
-            const files = submissionFiles[milestoneId] || [];
-            let fileUrls: string[] = [];
-
-            if (files.length > 0) {
-                toast.info(`Uploading ${files.length} file(s)...`);
-                fileUrls = await uploadFilesToS3(milestoneId, files);
-                toast.success(`${fileUrls.length} file(s) uploaded successfully`);
+            // Prepare FormData with files and other data
+            const formData = new FormData();
+            formData.append('submission_description', description);
+            
+            // Add links as JSON array
+            if (links.length > 0) {
+                formData.append('submission_links', JSON.stringify(links));
             }
 
-            const { error } = await apiClient.projects.submitMilestone(milestoneId, {
-                submission_description: description,
-                submission_links: links.length > 0 ? links : null,
-                submission_files: fileUrls.length > 0 ? fileUrls : null,
-            });
+            // Add files directly to FormData
+            const files = submissionFiles[milestoneId] || [];
+            if (files.length > 0) {
+                files.forEach((file) => {
+                    formData.append('files', file);
+                });
+                toast.info(`Uploading ${files.length} file(s)...`);
+            }
+
+            const { error } = await apiClient.projects.submitMilestone(milestoneId, formData);
 
             if (error) throw new Error(error);
 
@@ -523,6 +497,40 @@ export default function ProjectWorkspace() {
                     </CardContent>
                 </Card>
 
+                {/* Freelancer Information (for Recruiters) */}
+                {isRecruiter && counterpartyInfo && (
+                    <Card className="glass border-white/10 mb-8">
+                        <CardHeader>
+                            <CardTitle>Freelancer Information</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-start space-x-4">
+                                <div className="flex-1">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <Label className="text-sm font-medium text-muted-foreground">Name</Label>
+                                            <p className="font-medium text-lg">{counterpartyInfo.name}</p>
+                                        </div>
+                                        <div>
+                                            <Label className="text-sm font-medium text-muted-foreground">Freelancer ID</Label>
+                                            <p className="font-mono text-sm">{project.freelancer_id}</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => navigate(`/profile/${project.freelancer_id}`)}
+                                        >
+                                            View Full Profile
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
@@ -612,10 +620,11 @@ export default function ProjectWorkspace() {
                                         </div>
                                     </div>
 
-                                    {/* Submission Section (for Freelancers) */}
+                                    {/* Submission Form (for Freelancers) */}
                                     {!isRecruiter &&
-                                        (milestone.status === "pending" ||
-                                            milestone.status === "revision_requested") &&
+                                        ((milestone.status === "pending" ||
+                                            milestone.status === "revision_requested") ||
+                                            editingMilestoneId === milestone.id) &&
                                         !milestone.payment_released &&
                                         project.status === "active" && (
                                             <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
@@ -716,44 +725,92 @@ export default function ProjectWorkspace() {
                                                     </div>
                                                 </div>
 
-                                                <Button
-                                                    onClick={() => handleSubmitMilestone(milestone.id)}
-                                                    disabled={
-                                                        isSubmitting[milestone.id] || 
-                                                        uploadingFiles[milestone.id] ||
-                                                        !(submissionDescriptions[milestone.id] || "").trim()
-                                                    }
-                                                    className="w-full bg-gradient-solana"
-                                                >
-                                                    {uploadingFiles[milestone.id] ? (
-                                                        <>
-                                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                            Uploading files...
-                                                        </>
-                                                    ) : isSubmitting[milestone.id] ? (
-                                                        <>
-                                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                            Submitting...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Upload className="w-4 h-4 mr-2" />
-                                                            Submit for Review
-                                                        </>
+                                                <div className="flex gap-2">
+                                                    {editingMilestoneId === milestone.id && (
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                setEditingMilestoneId(null);
+                                                                setSubmissionDescriptions(prev => {
+                                                                    const newState = { ...prev };
+                                                                    delete newState[milestone.id];
+                                                                    return newState;
+                                                                });
+                                                                setSubmissionLinks(prev => {
+                                                                    const newState = { ...prev };
+                                                                    delete newState[milestone.id];
+                                                                    return newState;
+                                                                });
+                                                                setSubmissionFiles(prev => {
+                                                                    const newState = { ...prev };
+                                                                    delete newState[milestone.id];
+                                                                    return newState;
+                                                                });
+                                                            }}
+                                                            className="flex-1"
+                                                        >
+                                                            Cancel
+                                                        </Button>
                                                     )}
-                                                </Button>
+                                                    <Button
+                                                        onClick={() => {
+                                                            handleSubmitMilestone(milestone.id);
+                                                            if (editingMilestoneId === milestone.id) {
+                                                                setEditingMilestoneId(null);
+                                                            }
+                                                        }}
+                                                        disabled={
+                                                            isSubmitting[milestone.id] ||
+                                                            !(submissionDescriptions[milestone.id] || "").trim()
+                                                        }
+                                                        className={editingMilestoneId === milestone.id ? "flex-1 bg-gradient-solana" : "w-full bg-gradient-solana"}
+                                                    >
+                                                        {isSubmitting[milestone.id] ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                                {editingMilestoneId === milestone.id ? "Updating..." : "Submitting..."}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Upload className="w-4 h-4 mr-2" />
+                                                                {editingMilestoneId === milestone.id ? "Update Submission" : "Submit Milestone"}
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                </div>
                                             </div>
                                         )}
 
                                     {/* Submission Display */}
-                                    {milestone.submission_description && (
+                                    {milestone.submission_description && editingMilestoneId !== milestone.id && (
                                         <div className="space-y-3">
                                             <Separator />
                                             <div>
-                                                <h4 className="font-semibold mb-2 flex items-center space-x-2">
-                                                    <CheckCircle className="w-4 h-4 text-success" />
-                                                    <span>Submitted Work</span>
-                                                </h4>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h4 className="font-semibold flex items-center space-x-2">
+                                                        <CheckCircle className="w-4 h-4 text-success" />
+                                                        <span>Submitted Work</span>
+                                                    </h4>
+                                                    {!isRecruiter && milestone.status === 'submitted' && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setEditingMilestoneId(milestone.id);
+                                                                setSubmissionDescriptions(prev => ({
+                                                                    ...prev,
+                                                                    [milestone.id]: milestone.submission_description || ''
+                                                                }));
+                                                                setSubmissionLinks(prev => ({
+                                                                    ...prev,
+                                                                    [milestone.id]: (milestone.submission_links || []).join('\n')
+                                                                }));
+                                                            }}
+                                                        >
+                                                            Edit
+                                                        </Button>
+                                                    )}
+                                                </div>
                                                 <p className="text-sm text-muted-foreground whitespace-pre-wrap mb-3">
                                                     {milestone.submission_description}
                                                 </p>
