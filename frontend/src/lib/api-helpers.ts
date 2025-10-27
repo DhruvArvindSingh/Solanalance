@@ -5,7 +5,7 @@
  * These should be called after successful escrow operations to keep your database in sync.
  */
 
-import { apiRequest } from "@/lib/api-client";
+import { apiClient } from "@/lib/api-client";
 
 // ============================================================================
 // JOB FUNDING WITH BACKEND VERIFICATION
@@ -26,12 +26,19 @@ export interface FundJobData {
  */
 export async function verifyAndFundJob(data: FundJobData) {
     try {
-        const response = await apiRequest("/api/escrow/verify-funding", {
+        const response = await apiClient.request("/escrow/verify-funding", {
             method: "POST",
             body: JSON.stringify(data),
         });
 
-        return { success: true, data: response };
+        if (response.error) {
+            return {
+                success: false,
+                error: response.error
+            };
+        }
+
+        return { success: true, data: response.data };
     } catch (error: any) {
         console.error("Error verifying job funding:", error);
         return {
@@ -56,12 +63,19 @@ export interface ApproveMilestoneData {
  */
 export async function verifyAndApproveMilestone(data: ApproveMilestoneData) {
     try {
-        const response = await apiRequest("/api/escrow/verify-approval", {
+        const response = await apiClient.request("/escrow/verify-approval", {
             method: "POST",
             body: JSON.stringify(data),
         });
 
-        return { success: true, data: response };
+        if (response.error) {
+            return {
+                success: false,
+                error: response.error
+            };
+        }
+
+        return { success: true, data: response.data };
     } catch (error: any) {
         console.error("Error verifying milestone approval:", error);
         return {
@@ -86,12 +100,19 @@ export interface ClaimMilestoneData {
  */
 export async function verifyAndClaimMilestone(data: ClaimMilestoneData) {
     try {
-        const response = await apiRequest("/api/escrow/verify-claim", {
+        const response = await apiClient.request("/escrow/verify-claim", {
             method: "POST",
             body: JSON.stringify(data),
         });
 
-        return { success: true, data: response };
+        if (response.error) {
+            return {
+                success: false,
+                error: response.error
+            };
+        }
+
+        return { success: true, data: response.data };
     } catch (error: any) {
         console.error("Error verifying milestone claim:", error);
         return {
@@ -110,10 +131,18 @@ export async function verifyAndClaimMilestone(data: ClaimMilestoneData) {
  */
 export async function getEscrowStatus(jobId: string) {
     try {
-        const response = await apiRequest(`/api/escrow/status/${jobId}`, {
+        const response = await apiClient.request(`/escrow/status/${jobId}`, {
             method: "GET",
         });
-        return { success: true, data: response };
+
+        if (response.error) {
+            return {
+                success: false,
+                error: response.error
+            };
+        }
+
+        return { success: true, data: response.data };
     } catch (error: any) {
         console.error("Error fetching escrow status:", error);
         return {
@@ -137,10 +166,14 @@ export interface CancelJobData {
  */
 export async function updateJobCancelled(data: CancelJobData) {
     try {
-        await apiRequest("/api/jobs/cancel", {
+        const response = await apiClient.request("/jobs/cancel", {
             method: "POST",
             body: JSON.stringify(data),
         });
+
+        if (response.error) {
+            return { success: false, error: response.error };
+        }
 
         return { success: true };
     } catch (error) {
@@ -158,10 +191,10 @@ export async function updateJobCancelled(data: CancelJobData) {
  */
 export async function getJobEscrowData(jobId: string) {
     try {
-        const response = await apiRequest(`/api/jobs/${jobId}/escrow`, {
+        const response = await apiClient.request(`/jobs/${jobId}/escrow`, {
             method: "GET",
         });
-        return response;
+        return response.error ? null : response.data;
     } catch (error) {
         console.error("Error fetching escrow data:", error);
         return null;
@@ -173,10 +206,10 @@ export async function getJobEscrowData(jobId: string) {
  */
 export async function getFreelancerWallet(freelancerId: string): Promise<string | null> {
     try {
-        const response = await apiRequest(`/api/profiles/${freelancerId}/wallet`, {
+        const response = await apiClient.request(`/profiles/${freelancerId}/wallet`, {
             method: "GET",
         });
-        return response.walletAddress;
+        return response.error ? null : response.data?.walletAddress;
     } catch (error) {
         console.error("Error fetching freelancer wallet:", error);
         return null;
@@ -188,10 +221,10 @@ export async function getFreelancerWallet(freelancerId: string): Promise<string 
  */
 export async function getRecruiterWallet(recruiterId: string): Promise<string | null> {
     try {
-        const response = await apiRequest(`/api/profiles/${recruiterId}/wallet`, {
+        const response = await apiClient.request(`/profiles/${recruiterId}/wallet`, {
             method: "GET",
         });
-        return response.walletAddress;
+        return response.error ? null : response.data?.walletAddress;
     } catch (error) {
         console.error("Error fetching recruiter wallet:", error);
         return null;

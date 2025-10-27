@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/integrations/apiClient/client";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL, SystemProgram, Transaction } from "@solana/web3.js";
+import { claimMilestone } from "@/lib/escrow-operations";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RatingModal } from "@/components/RatingModal";
 import { VerifyFundsButton } from "@/components/VerifyFundsButton";
 import { useMessagingStore } from "@/stores/messagingStore";
+import { useEscrowWithVerification } from "@/hooks/useEscrowWithVerification";
 import {
     ArrowLeft,
     CheckCircle,
@@ -27,6 +29,7 @@ import {
     Loader2,
     Download,
     ExternalLink,
+    Edit,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -67,6 +70,8 @@ interface Project {
         duration: string;
         created_at: string;
         status: string;
+        recruiter_wallet: string | null;
+        freelancer_wallet: string | null;
     };
     staking: {
         total_staked: number;
@@ -80,11 +85,14 @@ export default function ProjectWorkspace() {
     const { sendMessage } = useMessagingStore();
     const navigate = useNavigate();
     const { connection } = useConnection();
-    const { publicKey, sendTransaction } = useWallet();
+    const wallet = useWallet();
+    const { publicKey } = wallet;
+    const { approveMilestonePayment, claimMilestonePayment } = useEscrowWithVerification();
 
     const [project, setProject] = useState<Project | null>(null);
     const [milestones, setMilestones] = useState<Milestone[]>([]);
     const [loading, setLoading] = useState(true);
+    const [recruiterWallet, setRecruiterWallet] = useState<string>("");
 
     // Submission state - track per milestone
     const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
@@ -95,6 +103,9 @@ export default function ProjectWorkspace() {
 
     // Review state
     const [isReviewing, setIsReviewing] = useState(false);
+
+    // Claim state
+    const [isClaimingPayment, setIsClaimingPayment] = useState<Record<string, boolean>>({});
     const [reviewComments, setReviewComments] = useState("");
     const [reviewingMilestoneId, setReviewingMilestoneId] = useState<string | null>(null);
 
@@ -111,6 +122,28 @@ export default function ProjectWorkspace() {
 
         fetchProjectData();
     }, [id, user]);
+
+    // Pre-populate form data for revision_requested milestones
+    useEffect(() => {
+        if (project?.milestones) {
+            const newDescriptions: { [key: string]: string } = {};
+            const newLinks: { [key: string]: string } = {};
+
+            project.milestones.forEach(milestone => {
+                if (milestone.status === 'revision_requested' && milestone.submission_description) {
+                    newDescriptions[milestone.id] = milestone.submission_description;
+                    newLinks[milestone.id] = (milestone.submission_links || []).join('\n');
+                }
+            });
+
+            if (Object.keys(newDescriptions).length > 0) {
+                setSubmissionDescriptions(prev => ({ ...prev, ...newDescriptions }));
+            }
+            if (Object.keys(newLinks).length > 0) {
+                setSubmissionLinks(prev => ({ ...prev, ...newLinks }));
+            }
+        }
+    }, [project?.milestones]);
 
     const fetchProjectData = async () => {
         if (!id || !user) return;
@@ -136,7 +169,26 @@ export default function ProjectWorkspace() {
             setProject(projectData);
             setMilestones(projectData.milestones || []);
 
-            // TODO: Add rating check and counterparty profile fetch when API endpoints are available
+            // Get recruiter wallet address from job data
+            console.log("projectData", projectData);
+            if (projectData.job?.recruiter_wallet) {
+                setRecruiterWallet(projectData.job.recruiter_wallet);
+                console.log("Recruiter wallet from job:", projectData.job.recruiter_wallet);
+            } else {
+                console.warn("No recruiter wallet found in job data, fetching from profile");
+                // Fallback to recruiter's profile wallet for verification
+                try {
+                    const { data: recruiterProfile } = await apiClient.profile.getById(projectData.recruiter_id);
+                    if (recruiterProfile?.wallet_address) {
+                        setRecruiterWallet(recruiterProfile.wallet_address);
+                        console.log("Using recruiter profile wallet:", recruiterProfile.wallet_address);
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch recruiter profile:", error);
+                }
+            }
+
+            // Check if user has already rated
             setHasRated(false);
 
             // Get counterparty info
@@ -219,7 +271,7 @@ export default function ProjectWorkspace() {
             // Prepare FormData with files and other data
             const formData = new FormData();
             formData.append('submission_description', description);
-            
+
             // Add links as JSON array
             if (links.length > 0) {
                 formData.append('submission_links', JSON.stringify(links));
@@ -270,47 +322,38 @@ export default function ProjectWorkspace() {
                 return;
             }
 
-            // Get freelancer wallet address
-            const { data: freelancerProfile, error: profileError } = await apiClient.profile.getById(project.freelancer_id);
-            if (profileError) throw new Error(profileError);
+            // Call smart contract to approve milestone
+            const result = await approveMilestonePayment(
+                project.job_id,
+                milestone.stage_number - 1, // Convert to 0-indexed (0, 1, 2)
+                async (data) => {
+                    // Update backend after on-chain approval succeeds
+                    const { error: reviewError } = await apiClient.projects.reviewMilestone(
+                        milestone.id,
+                        {
+                            status: 'approved',
+                            comments: reviewComments || null,
+                            transaction_signature: data.txSignature,
+                        }
+                    );
 
-            if (!freelancerProfile?.wallet_address) {
-                toast.error("Freelancer wallet not found");
-                setIsReviewing(false);
-                setReviewingMilestoneId(null);
-                return;
-            }
+                    if (reviewError) throw new Error(reviewError);
 
-            // Create payment transaction (in production, this would release from escrow)
-            const transaction = new Transaction().add(
-                SystemProgram.transfer({
-                    fromPubkey: publicKey,
-                    toPubkey: publicKey, // In production: freelancer's public key
-                    lamports: Math.floor(milestone.payment_amount * LAMPORTS_PER_SOL),
-                })
+                    toast.success("Milestone approved! Freelancer can now claim payment.");
+                    setReviewComments("");
+                    fetchProjectData();
+
+                    // If this was the final milestone, show rating modal
+                    if (milestone.stage_number === 3) {
+                        setTimeout(() => {
+                            setShowRatingModal(true);
+                        }, 1500);
+                    }
+                }
             );
 
-            const signature = await sendTransaction(transaction, connection);
-            await connection.confirmTransaction(signature, "confirmed");
-
-            // Review milestone
-            const { error: reviewError } = await apiClient.projects.reviewMilestone(milestone.id, {
-                status: 'approved',
-                comments: reviewComments || null,
-                transaction_signature: signature,
-            });
-
-            if (reviewError) throw new Error(reviewError);
-
-            toast.success("Milestone approved! Payment sent to freelancer.");
-            setReviewComments("");
-            fetchProjectData();
-
-            // If this was the final milestone, show rating modal
-            if (milestone.stage_number === 3) {
-                setTimeout(() => {
-                    setShowRatingModal(true);
-                }, 1500);
+            if (!result.success) {
+                throw new Error(result.error || "Failed to approve milestone");
             }
         } catch (error: any) {
             console.error("Error approving milestone:", error);
@@ -341,6 +384,151 @@ export default function ProjectWorkspace() {
         } catch (error: any) {
             console.error("Error requesting revision:", error);
             toast.error("Failed to request revision");
+        }
+    };
+
+    const handleClaimMilestone = async (milestone: Milestone) => {
+        console.log("=== CLAIM MILESTONE DEBUG START ===");
+        console.log("Milestone:", milestone);
+        console.log("Connected wallet:", publicKey?.toBase58());
+
+        if (!publicKey) {
+            console.error("No wallet connected");
+            toast.error("Please connect your wallet to claim reward");
+            return;
+        }
+
+        if (!project) {
+            console.error("No project data");
+            toast.error("Project information not found");
+            return;
+        }
+
+        console.log("Project data:", {
+            id: project.id,
+            job_id: project.job_id,
+            recruiter_id: project.recruiter_id,
+            freelancer_id: project.freelancer_id,
+            staking: project.staking
+        });
+
+        // Check if funds have been staked
+        if (project.staking.total_staked === 0) {
+            console.error("Escrow not funded. Total staked:", project.staking.total_staked);
+            toast.error("Escrow has not been funded yet. The recruiter needs to stake funds before you can claim payment.");
+            return;
+        }
+
+        setIsClaimingPayment(prev => ({ ...prev, [milestone.id]: true }));
+
+        try {
+            // Get recruiter wallet address
+            console.log("Fetching recruiter profile for ID:", project.recruiter_id);
+            const { data: recruiterProfile, error: recruiterError } = await apiClient.profile.getById(project.recruiter_id);
+
+            if (recruiterError) {
+                console.error("Recruiter profile fetch error:", recruiterError);
+                throw new Error(recruiterError);
+            }
+
+            console.log("Recruiter profile:", recruiterProfile);
+
+            if (!recruiterProfile?.wallet_address) {
+                console.error("Recruiter wallet address missing");
+                throw new Error("Recruiter wallet not found");
+            }
+
+            console.log("Recruiter wallet:", recruiterProfile.wallet_address);
+
+            // Get freelancer wallet address to verify
+            console.log("Fetching freelancer profile for ID:", project.freelancer_id);
+            const { data: freelancerProfile, error: freelancerError } = await apiClient.profile.getById(project.freelancer_id);
+
+            if (freelancerError) {
+                console.error("Freelancer profile fetch error:", freelancerError);
+                throw new Error(freelancerError);
+            }
+
+            console.log("Freelancer profile:", freelancerProfile);
+
+            if (!freelancerProfile?.wallet_address) {
+                console.error("Freelancer wallet address missing");
+                throw new Error("Freelancer wallet not found");
+            }
+
+            console.log("Freelancer wallet:", freelancerProfile.wallet_address);
+
+            // Verify the connected wallet matches the freelancer wallet
+            const connectedWallet = publicKey.toBase58();
+            const freelancerWallet = freelancerProfile.wallet_address;
+
+            console.log("Wallet verification:", {
+                connected: connectedWallet,
+                expected: freelancerWallet,
+                match: connectedWallet === freelancerWallet
+            });
+
+            if (connectedWallet !== freelancerWallet) {
+                console.error("Wallet mismatch!");
+                throw new Error("Connected wallet does not match the freelancer wallet for this project");
+            }
+
+            // Call smart contract to claim milestone
+            const milestoneIndex = milestone.stage_number - 1; // Convert to 0-indexed
+
+            console.log("Calling claimMilestone with params:", {
+                jobId: project.job_id,
+                recruiterWallet: recruiterProfile.wallet_address,
+                milestoneIndex: milestoneIndex,
+                freelancerWallet: connectedWallet
+            });
+
+            toast.info("Claiming milestone reward from escrow...");
+            const result = await claimMilestone(
+                wallet,
+                project.job_id,
+                recruiterProfile.wallet_address,
+                milestoneIndex
+            );
+
+            console.log("Claim result:", result);
+
+            if (!result.success) {
+                console.error("Claim failed:", result.error);
+                throw new Error(result.error || "Failed to claim milestone from blockchain");
+            }
+
+            console.log("Claim successful! Transaction:", result.txSignature);
+            toast.success("Milestone reward claimed successfully!");
+
+            // Update backend to mark payment as released
+            console.log("Updating backend for milestone:", milestone.id);
+            const { error } = await apiClient.projects.claimMilestone(milestone.id, {
+                transaction_signature: result.txSignature
+            });
+
+            if (error) {
+                console.error("Backend update error:", error);
+                toast.warning("Funds claimed but database update failed. Please refresh the page.");
+            } else {
+                console.log("Backend updated successfully");
+            }
+
+            // Refresh project data
+            console.log("Refreshing project data...");
+            fetchProjectData();
+            console.log("=== CLAIM MILESTONE DEBUG END (SUCCESS) ===");
+        } catch (error: any) {
+            console.error("=== CLAIM MILESTONE ERROR ===");
+            console.error("Error type:", error.constructor?.name);
+            console.error("Error message:", error.message);
+            console.error("Error stack:", error.stack);
+            console.error("Full error:", error);
+            console.error("=== CLAIM MILESTONE DEBUG END (ERROR) ===");
+
+            toast.error(error.message || "Failed to claim milestone reward");
+        } finally {
+            setIsClaimingPayment(prev => ({ ...prev, [milestone.id]: false }));
         }
     };
 
@@ -415,12 +603,12 @@ export default function ProjectWorkspace() {
                             </p>
                         </div>
                         {/* Verify Funds Button for Freelancers on Active Jobs */}
-                        {!isRecruiter && project.status === "active" && (
+                        {!isRecruiter && project.status === "active" && recruiterWallet && (
                             <div className="ml-4">
                                 <VerifyFundsButton
                                     jobId={project.job.id}
                                     jobTitle={project.job.title}
-                                    freelancerWallet={""} // Will be determined by the component
+                                    recruiterWallet={recruiterWallet}
                                     expectedAmount={project.job.total_payment}
                                     variant="outline"
                                     size="default"
@@ -609,6 +797,42 @@ export default function ProjectWorkspace() {
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
+                                    {/* Edit & Resubmit Button for Revision Requested (Freelancers) */}
+                                    {!isRecruiter &&
+                                        milestone.status === 'revision_requested' &&
+                                        editingMilestoneId !== milestone.id && (
+                                            <div className="p-4 bg-warning/5 rounded-lg border border-warning/20">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <h4 className="font-semibold text-warning flex items-center space-x-2">
+                                                            <AlertCircle className="w-5 h-5" />
+                                                            <span>Revision Required</span>
+                                                        </h4>
+                                                        <p className="text-sm text-muted-foreground mt-1">
+                                                            The recruiter has requested changes to your submission.
+                                                        </p>
+                                                    </div>
+                                                    <Button
+                                                        onClick={() => {
+                                                            setEditingMilestoneId(milestone.id);
+                                                            setSubmissionDescriptions(prev => ({
+                                                                ...prev,
+                                                                [milestone.id]: milestone.submission_description || ''
+                                                            }));
+                                                            setSubmissionLinks(prev => ({
+                                                                ...prev,
+                                                                [milestone.id]: (milestone.submission_links || []).join('\n')
+                                                            }));
+                                                        }}
+                                                        className="bg-gradient-solana hover:opacity-90"
+                                                    >
+                                                        <Edit className="w-4 h-4 mr-2" />
+                                                        Edit & Resubmit
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
                                     {/* Payment Info */}
                                     <div className="flex items-center justify-between p-3 bg-gradient-card rounded-lg">
                                         <span className="text-sm text-muted-foreground">
@@ -694,7 +918,7 @@ export default function ProjectWorkspace() {
                                                             className="cursor-pointer"
                                                             accept=".pdf,.doc,.docx,.txt,.zip,.png,.jpg,.jpeg,.gif"
                                                         />
-                                                        
+
                                                         {/* Display selected files */}
                                                         {(submissionFiles[milestone.id] || []).length > 0 && (
                                                             <div className="space-y-1 p-2 bg-muted/50 rounded-md">
@@ -791,7 +1015,7 @@ export default function ProjectWorkspace() {
                                                         <CheckCircle className="w-4 h-4 text-success" />
                                                         <span>Submitted Work</span>
                                                     </h4>
-                                                    {!isRecruiter && milestone.status === 'submitted' && (
+                                                    {!isRecruiter && (milestone.status === 'submitted' || milestone.status === 'revision_requested') && (
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
@@ -807,7 +1031,7 @@ export default function ProjectWorkspace() {
                                                                 }));
                                                             }}
                                                         >
-                                                            Edit
+                                                            {milestone.status === 'revision_requested' ? 'Edit & Resubmit' : 'Edit'}
                                                         </Button>
                                                     )}
                                                 </div>
@@ -933,6 +1157,53 @@ export default function ProjectWorkspace() {
                                                     {milestone.reviewer_comments}
                                                 </p>
                                             </div>
+                                        )}
+
+                                    {/* Claim Reward Button (for Freelancers) */}
+                                    {!isRecruiter &&
+                                        milestone.status === 'approved' &&
+                                        !milestone.payment_released &&
+                                        project.status === "active" && (
+                                            project.staking.total_staked > 0 ? (
+                                                <div className="p-4 bg-success/5 rounded-lg border border-success/20">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div>
+                                                            <h4 className="font-semibold text-success flex items-center space-x-2">
+                                                                <CheckCircle className="w-5 h-5" />
+                                                                <span>Milestone Approved!</span>
+                                                            </h4>
+                                                            <p className="text-sm text-muted-foreground mt-1">
+                                                                Your work has been approved. Claim your reward of {milestone.payment_amount.toFixed(2)} SOL from escrow.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <Button
+                                                        onClick={() => handleClaimMilestone(milestone)}
+                                                        disabled={isClaimingPayment[milestone.id]}
+                                                        className="w-full bg-gradient-solana"
+                                                    >
+                                                        {isClaimingPayment[milestone.id] ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                                Claiming Reward...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Coins className="w-4 h-4 mr-2" />
+                                                                Claim {milestone.payment_amount.toFixed(2)} SOL Reward
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <Alert className="border-warning/30 bg-warning/10">
+                                                    <AlertCircle className="h-4 w-4 text-warning" />
+                                                    <AlertDescription>
+                                                        <strong>Milestone Approved!</strong> However, the escrow has not been funded yet.
+                                                        The recruiter needs to stake funds before you can claim your payment.
+                                                    </AlertDescription>
+                                                </Alert>
+                                            )
                                         )}
 
                                     {/* Payment Released Display */}

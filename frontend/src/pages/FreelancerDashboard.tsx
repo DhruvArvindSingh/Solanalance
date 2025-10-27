@@ -35,6 +35,8 @@ interface Project {
         id: string;
         title: string;
         total_payment: number;
+        recruiter_wallet: string | null;
+        freelancer_wallet: string | null;
     };
 }
 
@@ -67,6 +69,7 @@ export default function FreelancerDashboard() {
     }, [user, userRole]);
 
     const fetchDashboardData = async () => {
+        console.log("FETCHING DASHBOARD DATA");
         if (!user) return;
 
         try {
@@ -81,6 +84,7 @@ export default function FreelancerDashboard() {
 
             // Fetch projects
             const { data: projectsData, error: projectsError } = await apiClient.projects.getMyProjects();
+            console.log("PROJECTS DATA", projectsData);
 
             if (projectsError) throw new Error(projectsError);
 
@@ -344,15 +348,23 @@ export default function FreelancerDashboard() {
                                                     <div className="flex items-center space-x-2">
                                                         {/* Show Verify Funds button for active projects */}
                                                         {project.status === "active" && (
-                                                            <div onClick={(e) => e.stopPropagation()}>
-                                                                <VerifyFundsButton
-                                                                    jobId={project.job.id}
-                                                                    jobTitle={project.job.title}
-                                                                    expectedAmount={project.job.total_payment}
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                />
-                                                            </div>
+                                                            project.job.recruiter_wallet ? (
+                                                                <div onClick={(e) => { e.stopPropagation() }}>
+                                                                    <VerifyFundsButton
+                                                                        jobId={project.job.id}
+                                                                        jobTitle={project.job.title}
+                                                                        recruiterWallet={project.job.recruiter_wallet}
+                                                                        freelancerWallet={project.job.freelancer_wallet || undefined}
+                                                                        expectedAmount={project.job.total_payment}
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <Badge variant="outline" className="text-xs text-muted-foreground">
+                                                                    Escrow not funded
+                                                                </Badge>
+                                                            )
                                                         )}
 
                                                         <Badge

@@ -123,8 +123,9 @@ export default function JobApplicants() {
         try {
             // Update job status
             await apiClient.jobs.update(id!, {
-                status: "in_progress",
+                status: "active",
                 selectedFreelancerId: selectedApplication.freelancer_id,
+
             });
 
             // Update application status to selected

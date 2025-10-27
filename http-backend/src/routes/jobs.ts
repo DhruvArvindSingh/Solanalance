@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticateToken, requireRole } from '../middleware/auth';
+import { getEscrowDetails } from '../utils/solana-verification';
 
 const router = express.Router();
 
@@ -189,6 +190,8 @@ router.get('/:id', async (req, res) => {
             views_count: job.viewsCount + 1,
             created_at: job.createdAt,
             recruiter_id: job.recruiterId,
+            recruiter_wallet: job.recruiterWallet,
+            freelancer_wallet: job.freelancerWallet,
             recruiter: {
                 full_name: job.recruiter.fullName,
                 company_name: job.recruiter.companyName,
@@ -235,6 +238,33 @@ router.get('/:id', async (req, res) => {
                     reviewer_comments: milestone.reviewerComments,
                     created_at: milestone.createdAt
                 }));
+            }
+        }
+
+        // Add escrow details for active jobs
+        if (job.status === 'active' && job.recruiterWallet) {
+            try {
+                const escrowDetails = await getEscrowDetails(job.recruiterWallet, job.id);
+
+                if (escrowDetails.success) {
+                    response.escrow = {
+                        pda_address: escrowDetails.escrowPDA,
+                        current_funds: escrowDetails.currentFunds || 0,
+                        milestones: escrowDetails.milestones || [],
+                        verified_recruiter_wallet: escrowDetails.recruiterWallet,
+                        verified_freelancer_wallet: escrowDetails.freelancerWallet,
+                        error: escrowDetails.error || null
+                    };
+                } else {
+                    response.escrow = {
+                        error: escrowDetails.error || 'Failed to get escrow details'
+                    };
+                }
+            } catch (escrowError) {
+                console.error('Error getting escrow details:', escrowError);
+                response.escrow = {
+                    error: 'Failed to fetch escrow information'
+                };
             }
         }
 
@@ -327,7 +357,9 @@ router.get('/recruiter/jobs', authenticateToken, requireRole('recruiter'), async
             status: job.status,
             total_payment: parseFloat(job.totalPayment.toString()),
             created_at: job.createdAt,
-            applicants_count: job._count.applications
+            applicants_count: job._count.applications,
+            recruiter_wallet: job.recruiterWallet,
+            freelancer_wallet: job.freelancerWallet
         }));
 
         res.json(transformedJobs);

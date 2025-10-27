@@ -119,6 +119,14 @@ router.post('/',
                 }
             });
 
+            // Update job with freelancer wallet if provided
+            if (walletAddress) {
+                await req.prisma.job.update({
+                    where: { id: jobId },
+                    data: { freelancerWallet: walletAddress }
+                });
+            }
+
             // Create notification for recruiter
             await req.prisma.notification.create({
                 data: {
@@ -150,6 +158,26 @@ router.post('/',
                             status: 'active'
                         }
                     });
+
+                    // Create initial milestones from job stages
+                    const stages = await req.prisma.jobStage.findMany({
+                        where: { jobId: application.jobId },
+                        orderBy: { stageNumber: 'asc' }
+                    });
+
+                    if (stages.length > 0) {
+                        const milestones = stages.map((stage: any) => ({
+                            projectId: project.id,
+                            stageId: stage.id,
+                            stageNumber: stage.stageNumber,
+                            status: 'pending',
+                            paymentAmount: stage.payment
+                        }));
+
+                        await req.prisma.milestone.createMany({
+                            data: milestones
+                        });
+                    }
 
                     // Create initial system message to start the conversation
                     await req.prisma.message.create({
@@ -317,6 +345,26 @@ router.put('/:id/status', authenticateToken, requireRole('recruiter'), async (re
                         status: 'active'
                     }
                 });
+
+                // Create initial milestones from job stages
+                const stages = await req.prisma.jobStage.findMany({
+                    where: { jobId: application.jobId },
+                    orderBy: { stageNumber: 'asc' }
+                });
+
+                if (stages.length > 0) {
+                    const milestones = stages.map((stage: any) => ({
+                        projectId: project.id,
+                        stageId: stage.id,
+                        stageNumber: stage.stageNumber,
+                        status: 'pending',
+                        paymentAmount: stage.payment
+                    }));
+
+                    await req.prisma.milestone.createMany({
+                        data: milestones
+                    });
+                }
 
                 // Create initial system message to start the conversation
                 await req.prisma.message.create({

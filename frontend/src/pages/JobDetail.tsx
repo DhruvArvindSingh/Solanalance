@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/integrations/apiClient/client";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { approveMilestone } from "@/lib/escrow-operations";
+import { approveMilestone, claimMilestone } from "@/lib/escrow-operations";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RatingBadge } from "@/components/RatingBadge";
 import { ApplicationModal } from "@/components/ApplicationModal";
+import { VerifyFundsButton } from "@/components/VerifyFundsButton";
 import {
     ArrowLeft,
     Briefcase,
@@ -31,6 +32,9 @@ import {
     Download,
     XCircle,
     Loader2,
+    Shield,
+    AlertCircle,
+    Edit,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -41,6 +45,15 @@ interface JobStage {
     name: string;
     description: string | null;
     payment: number;
+}
+
+interface EscrowInfo {
+    pda_address?: string;
+    current_funds?: number;
+    milestones?: number[];
+    verified_recruiter_wallet?: string;
+    verified_freelancer_wallet?: string;
+    error?: string | null;
 }
 
 interface Job {
@@ -56,6 +69,9 @@ interface Job {
     views_count: number;
     created_at: string;
     recruiter_id: string;
+    recruiter_wallet: string | null;
+    freelancer_wallet: string | null;
+    escrow?: EscrowInfo;
 }
 
 interface RecruiterProfile {
@@ -111,9 +127,11 @@ export default function JobDetail() {
     const [reviewComments, setReviewComments] = useState("");
     const [isApproving, setIsApproving] = useState(false);
     const [isRequestingChanges, setIsRequestingChanges] = useState(false);
-    
+    const [claimingMilestoneId, setClaimingMilestoneId] = useState<string | null>(null);
+
     const { connection } = useConnection();
-    const { publicKey, sendTransaction } = useWallet();
+    const wallet = useWallet();
+    const { publicKey } = wallet;
 
 
     useEffect(() => {
@@ -143,7 +161,10 @@ export default function JobDetail() {
                     total_payment: jobData.total_payment,
                     views_count: jobData.views_count,
                     created_at: jobData.created_at,
-                    recruiter_id: jobData.recruiter_id
+                    recruiter_id: jobData.recruiter_id,
+                    recruiter_wallet: jobData.recruiter_wallet,
+                    freelancer_wallet: jobData.freelancer_wallet,
+                    escrow: jobData.escrow
                 });
 
                 setStages(jobData.stages || []);
@@ -231,20 +252,59 @@ export default function JobDetail() {
             return;
         }
 
-        if (!job || !activeProjectId) {
-            toast.error("Project information not found");
+        if (!job) {
+            toast.error("Job information not found");
+            return;
+        }
+
+        if (!job.recruiter_wallet) {
+            toast.error("Cannot approve milestone: Escrow has not been funded yet. Please fund the escrow first to enable milestone approvals.");
+            return;
+        }
+
+        if (job.status !== 'active') {
+            toast.error("Cannot approve milestone: Job must be in 'active' status. Please fund the escrow to activate the job.");
+            return;
+        }
+
+        // Check if milestone is already approved or claimed
+        if (milestone.status === 'approved') {
+            toast.error("This milestone has already been approved");
+            return;
+        }
+
+        if (milestone.payment_released) {
+            toast.error("This milestone has already been paid");
             return;
         }
 
         setIsApproving(true);
 
         try {
-            // Call smart contract to approve milestone
             const milestoneIndex = milestone.stage_number - 1; // Convert to 0-indexed
-            
+
+            // First, check the on-chain state to prevent duplicate approvals
+            toast.info("Checking milestone status on blockchain...");
+
+            // Import the getMilestoneStatus function to check on-chain state
+            const { getMilestoneStatus } = await import("@/lib/escrow-operations");
+            const milestoneStatuses = await getMilestoneStatus(job.recruiter_wallet, job.id);
+
+            if (milestoneStatuses && milestoneStatuses[milestoneIndex]) {
+                const onChainStatus = milestoneStatuses[milestoneIndex];
+                if (onChainStatus.approved) {
+                    toast.error("This milestone has already been approved on the blockchain. Refreshing page to sync status...");
+                    setTimeout(() => {
+                        fetchJobDetails();
+                    }, 1500);
+                    return;
+                }
+            }
+
+            // Call smart contract to approve milestone
             toast.info("Approving milestone on blockchain...");
             const result = await approveMilestone(
-                { publicKey, sendTransaction },
+                wallet,
                 job.id,
                 milestoneIndex
             );
@@ -266,12 +326,47 @@ export default function JobDetail() {
             toast.success("Milestone approved successfully!");
             setReviewingMilestoneId(null);
             setReviewComments("");
-            
+
             // Refresh job details to update milestone status
             fetchJobDetails();
         } catch (error: any) {
             console.error("Error approving milestone:", error);
-            toast.error(error.message || "Failed to approve milestone");
+
+            // Handle specific error cases
+            if (error.message?.includes("already been approved")) {
+                toast.warning("This milestone has already been approved. Refreshing page to sync status...");
+                // Refresh job details to get updated status
+                setTimeout(() => {
+                    fetchJobDetails();
+                }, 1500);
+            } else if (error.message?.includes("MilestoneAlreadyApproved")) {
+                toast.warning("This milestone was already approved on the blockchain. Syncing database...");
+                // Try to sync the status from blockchain to database
+                try {
+                    const syncResult = await apiClient.projects.syncMilestone(milestone.id);
+                    if (syncResult.error) {
+                        throw new Error(syncResult.error);
+                    }
+                    toast.success("Database synchronized with blockchain status");
+                    fetchJobDetails();
+                } catch (syncError) {
+                    console.error("Failed to sync database:", syncError);
+                    // Fallback to manual database update
+                    try {
+                        await apiClient.projects.reviewMilestone(milestone.id, {
+                            action: 'approve',
+                            comments: reviewComments || null,
+                        });
+                        toast.success("Database updated to reflect blockchain status");
+                        fetchJobDetails();
+                    } catch (fallbackError) {
+                        console.error("Failed to update database:", fallbackError);
+                        toast.error("Please refresh the page to see the updated status");
+                    }
+                }
+            } else {
+                toast.error(error.message || "Failed to approve milestone");
+            }
         } finally {
             setIsApproving(false);
         }
@@ -296,7 +391,7 @@ export default function JobDetail() {
             toast.success("Revision requested successfully");
             setReviewingMilestoneId(null);
             setReviewComments("");
-            
+
             // Refresh job details
             fetchJobDetails();
         } catch (error: any) {
@@ -304,6 +399,82 @@ export default function JobDetail() {
             toast.error("Failed to request changes");
         } finally {
             setIsRequestingChanges(false);
+        }
+    };
+
+    const handleClaimMilestone = async (milestone: Milestone) => {
+        if (!wallet.publicKey) {
+            toast.error("Please connect your wallet to claim milestone payment");
+            return;
+        }
+
+        if (!job?.recruiter_wallet) {
+            toast.error("Recruiter wallet address not found");
+            return;
+        }
+
+        // Double-check milestone status before claiming
+        if (milestone.status !== 'approved') {
+            toast.error("This milestone is not approved for claiming");
+            return;
+        }
+
+        if (milestone.payment_released) {
+            toast.error("This milestone payment has already been claimed");
+            return;
+        }
+
+        setClaimingMilestoneId(milestone.id);
+
+        try {
+            toast.info("Claiming milestone payment from escrow...");
+
+            // Add a small delay to prevent rapid clicking
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const milestoneIndex = milestone.stage_number - 1; // Convert to 0-indexed
+            const result = await claimMilestone(
+                wallet,
+                job.id,
+                job.recruiter_wallet,
+                milestoneIndex
+            );
+
+            if (!result.success) {
+                throw new Error(result.error || "Failed to claim milestone from blockchain");
+            }
+
+            toast.success("Milestone payment claimed successfully!");
+
+            // Update backend to mark payment as released
+            const { error } = await apiClient.projects.claimMilestone(milestone.id, {
+                transaction_signature: result.txSignature
+            });
+
+            if (error) {
+                console.error("Backend update error:", error);
+                toast.warning("Payment claimed but failed to update database. Please refresh the page.");
+            }
+
+            // Refresh job details to show updated status
+            fetchJobDetails();
+        } catch (error: any) {
+            console.error("Error claiming milestone:", error);
+
+            // Handle specific error cases
+            if (error.message?.includes("already been processed") || error.message?.includes("already been claimed")) {
+                toast.warning("This milestone has already been claimed. Refreshing page to update status...");
+                // Refresh job details to get updated status
+                setTimeout(() => {
+                    fetchJobDetails();
+                }, 1500);
+            } else if (error.message?.includes("Transaction simulation failed")) {
+                toast.error("Transaction failed. This milestone may have already been claimed or there's a network issue.");
+            } else {
+                toast.error(error.message || "Failed to claim milestone payment");
+            }
+        } finally {
+            setClaimingMilestoneId(null);
         }
     };
 
@@ -474,6 +645,95 @@ export default function JobDetail() {
                             </Card>
                         )}
 
+                        {/* Escrow Information (for active jobs) */}
+                        {job.status === 'active' && (job.recruiter_wallet || job.escrow) && (
+                            <Card className="glass border-white/10 border-primary/30">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center space-x-2">
+                                        <Shield className="w-5 h-5" />
+                                        <span>Escrow Information</span>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* Wallet Addresses */}
+                                        <div className="space-y-3">
+                                            <h4 className="font-medium text-sm">Wallet Addresses</h4>
+                                            <div className="space-y-2">
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Recruiter Wallet</p>
+                                                    <p className="text-sm font-mono bg-muted/30 p-2 rounded text-xs break-all">
+                                                        {job.escrow?.verified_recruiter_wallet || job.recruiter_wallet || 'Not available'}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Freelancer Wallet</p>
+                                                    <p className="text-sm font-mono bg-muted/30 p-2 rounded text-xs break-all">
+                                                        {job.escrow?.verified_freelancer_wallet || job.freelancer_wallet || 'Not available'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Escrow Details */}
+                                        <div className="space-y-3">
+                                            <h4 className="font-medium text-sm">Escrow Details</h4>
+                                            <div className="space-y-2">
+                                                {job.escrow?.pda_address && (
+                                                    <div>
+                                                        <p className="text-xs text-muted-foreground">PDA Address</p>
+                                                        <p className="text-sm font-mono bg-muted/30 p-2 rounded text-xs break-all">
+                                                            {job.escrow.pda_address}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Current Funds</p>
+                                                    <div className="flex items-center space-x-2">
+                                                        <Coins className="w-4 h-4 text-primary" />
+                                                        <span className="text-lg font-bold text-gradient">
+                                                            {job.escrow?.current_funds?.toFixed(4) || '0.0000'} SOL
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Expected Amount</p>
+                                                    <div className="flex items-center space-x-2">
+                                                        <Coins className="w-4 h-4 text-muted-foreground" />
+                                                        <span className="text-lg font-semibold">
+                                                            {job.total_payment.toFixed(4)} SOL
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Error Message */}
+                                    {job.escrow?.error && (
+                                        <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
+                                            <p className="text-sm text-warning">{job.escrow.error}</p>
+                                        </div>
+                                    )}
+
+                                    {/* Verify Funds Button */}
+                                    {job.recruiter_wallet && (
+                                        <div className="flex justify-center pt-2">
+                                            <VerifyFundsButton
+                                                jobId={job.id}
+                                                jobTitle={job.title}
+                                                recruiterWallet={job.recruiter_wallet}
+                                                freelancerWallet={job.freelancer_wallet || undefined}
+                                                expectedAmount={job.total_payment}
+                                                variant="default"
+                                                size="default"
+                                            />
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {/* Milestone Submissions (for active jobs) */}
                         {job.status === 'active' && milestones.length > 0 && (
                             <Card className="glass border-white/10">
@@ -493,7 +753,7 @@ export default function JobDetail() {
                                                     </div>
                                                     <div>
                                                         <h4 className="font-medium">{milestone.stage_name}</h4>
-                                                        <Badge 
+                                                        <Badge
                                                             variant={milestone.status === 'completed' ? 'default' : 'secondary'}
                                                             className="mt-1"
                                                         >
@@ -582,7 +842,7 @@ export default function JobDetail() {
                                                     {reviewingMilestoneId === milestone.id ? (
                                                         <div className="space-y-4">
                                                             <h4 className="font-semibold text-sm">Review Submission</h4>
-                                                            
+
                                                             <div className="space-y-2">
                                                                 <Label htmlFor={`review-comments-${milestone.id}`}>
                                                                     Feedback (Optional for approval, required for revision)
@@ -660,6 +920,43 @@ export default function JobDetail() {
                                                 </div>
                                             )}
 
+                                            {/* Claim Milestone Button (for Freelancers) */}
+                                            {userRole === 'freelancer' &&
+                                                milestone.status === 'approved' &&
+                                                !milestone.payment_released &&
+                                                job?.recruiter_wallet && (
+                                                    <div className="mt-4 p-4 bg-success/5 rounded-lg border border-success/20">
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <h4 className="font-semibold text-success flex items-center space-x-2">
+                                                                    <CheckCircle className="w-5 h-5" />
+                                                                    <span>Milestone Approved!</span>
+                                                                </h4>
+                                                                <p className="text-sm text-muted-foreground mt-1">
+                                                                    Your work has been approved. Claim your reward of {milestone.payment_amount.toFixed(2)} SOL from escrow.
+                                                                </p>
+                                                            </div>
+                                                            <Button
+                                                                onClick={() => handleClaimMilestone(milestone)}
+                                                                disabled={claimingMilestoneId === milestone.id || claimingMilestoneId !== null}
+                                                                className="bg-gradient-solana hover:opacity-90"
+                                                            >
+                                                                {claimingMilestoneId === milestone.id ? (
+                                                                    <>
+                                                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                                        Claiming...
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <Coins className="w-4 h-4 mr-2" />
+                                                                        Claim {milestone.payment_amount.toFixed(2)} SOL
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                             {milestone.reviewer_comments && (
                                                 <div className="mt-3 p-3 bg-primary/5 rounded border border-primary/20">
                                                     <p className="text-sm font-medium mb-1">Reviewer Comments</p>
@@ -671,6 +968,30 @@ export default function JobDetail() {
                                                             Reviewed {formatDistanceToNow(new Date(milestone.reviewed_at))} ago
                                                         </p>
                                                     )}
+                                                </div>
+                                            )}
+
+                                            {/* Revision Required Action (for Freelancers) */}
+                                            {userRole === 'freelancer' && milestone.status === 'revision_requested' && (
+                                                <div className="mt-4 p-4 bg-warning/5 rounded-lg border border-warning/20">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <h4 className="font-semibold text-warning flex items-center space-x-2">
+                                                                <AlertCircle className="w-5 h-5" />
+                                                                <span>Revision Required</span>
+                                                            </h4>
+                                                            <p className="text-sm text-muted-foreground mt-1">
+                                                                The recruiter has requested changes to your submission.
+                                                            </p>
+                                                        </div>
+                                                        <Button
+                                                            onClick={() => navigate(`/freelancer-dashboard`)}
+                                                            className="bg-gradient-solana hover:opacity-90"
+                                                        >
+                                                            <Edit className="w-4 h-4 mr-2" />
+                                                            Go to Project Workspace
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

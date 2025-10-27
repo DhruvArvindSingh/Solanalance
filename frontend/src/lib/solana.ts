@@ -57,6 +57,7 @@ export async function deriveEscrowPDA(
 ): Promise<[PublicKey, number]> {
     const jobIdHash = await hashJobIdAsync(jobId);
 
+
     return PublicKey.findProgramAddressSync(
         [
             Buffer.from("escrow"),
@@ -100,6 +101,8 @@ export async function getEscrowAccount(
         const recruiterPubkey = typeof recruiterWallet === "string"
             ? new PublicKey(recruiterWallet)
             : recruiterWallet;
+        console.log("1. Recruiter Key = ", recruiterPubkey.toString());
+        console.log("1. Job ID = ", jobId);
 
         const [escrowPDA] = await deriveEscrowPDA(recruiterPubkey, jobId);
 
@@ -143,6 +146,8 @@ export async function getEscrowBalance(
         const recruiterPubkey = typeof recruiterWallet === "string"
             ? new PublicKey(recruiterWallet)
             : recruiterWallet;
+        console.log("2. Recruiter Key = ", recruiterPubkey.toString());
+        console.log("2. Job ID = ", jobId);
 
         const [escrowPDA] = await deriveEscrowPDA(recruiterPubkey, jobId);
         const balance = await connection.getBalance(escrowPDA);

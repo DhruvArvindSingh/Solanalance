@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, AlertCircle, Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +14,7 @@ import {
 interface VerifyFundsButtonProps {
     jobId: string;
     jobTitle: string;
+    recruiterWallet: string;
     freelancerWallet?: string;
     expectedAmount?: number;
     variant?: "default" | "outline" | "ghost";
@@ -25,20 +25,35 @@ interface VerifyFundsButtonProps {
 export function VerifyFundsButton({
     jobId,
     jobTitle,
+    recruiterWallet,
     freelancerWallet,
     expectedAmount,
     variant = "outline",
     size = "sm",
     showIcon = true
 }: VerifyFundsButtonProps) {
-    const wallet = useWallet();
+    console.log("VerifyFundsButton props:", {
+        jobId,
+        jobTitle,
+        recruiterWallet,
+        freelancerWallet,
+        expectedAmount,
+        variant,
+        size,
+        showIcon
+    });
     const [isVerifying, setIsVerifying] = useState(false);
     const [showResultDialog, setShowResultDialog] = useState(false);
     const [verificationResult, setVerificationResult] = useState<any>(null);
 
     const handleVerify = async () => {
-        if (!wallet.connected || !wallet.publicKey) {
-            toast.error("Please connect your wallet first");
+        console.log("Verifying funds for job:", jobId);
+        console.log("Using recruiter wallet:", recruiterWallet);
+        console.log("Using freelancer wallet:", freelancerWallet);
+        console.log("Expected amount:", expectedAmount);
+
+        if (!recruiterWallet) {
+            toast.error("Recruiter wallet address not found");
             return;
         }
 
@@ -46,10 +61,11 @@ export function VerifyFundsButton({
 
         try {
             console.log("Verifying funds for job:", jobId);
+            console.log("Using recruiter wallet:", recruiterWallet);
 
-            // Verify on-chain
+            // Verify on-chain (no wallet connection needed - read-only)
             const result = await verifyEscrowFunds(
-                wallet,
+                recruiterWallet,
                 jobId,
                 freelancerWallet,
                 expectedAmount
@@ -64,7 +80,7 @@ export function VerifyFundsButton({
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('session')}`
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`
                         },
                         body: JSON.stringify({
                             jobId,
@@ -110,7 +126,7 @@ export function VerifyFundsButton({
         <>
             <Button
                 onClick={handleVerify}
-                disabled={isVerifying || !wallet.connected}
+                disabled={isVerifying}
                 variant={variant}
                 size={size}
                 className="gap-2"

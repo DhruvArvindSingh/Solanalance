@@ -19,6 +19,8 @@ interface JobWithStats {
     total_payment: number;
     created_at: string;
     applicants_count: number;
+    recruiter_wallet?: string;
+    freelancer_wallet?: string;
     project_id?: string; // For active jobs
 }
 
@@ -262,11 +264,13 @@ export default function RecruiterDashboard() {
                                                             </div>
 
                                                             {/* Show Verify Funds button for active jobs */}
-                                                            {job.status === "active" && (
+                                                            {job.status === "active" && job.recruiter_wallet && (
                                                                 <div onClick={(e) => e.stopPropagation()}>
                                                                     <VerifyFundsButton
                                                                         jobId={job.id}
                                                                         jobTitle={job.title}
+                                                                        recruiterWallet={job.recruiter_wallet}
+                                                                        freelancerWallet={job.freelancer_wallet}
                                                                         expectedAmount={job.total_payment}
                                                                         variant="outline"
                                                                         size="sm"

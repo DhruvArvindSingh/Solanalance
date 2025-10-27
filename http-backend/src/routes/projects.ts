@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { authenticateToken } from '../middleware/auth';
 import { uploadMilestoneFilesToS3 } from '../utils/s3Upload';
+import { getEscrowDetails } from '../utils/solana-verification';
 
 const router = express.Router();
 
@@ -403,6 +404,179 @@ router.put('/milestone/:id/review', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Review milestone error:', error);
         res.status(500).json({ error: 'Failed to review milestone' });
+    }
+});
+
+// Claim milestone payment (freelancers only)
+router.put('/milestone/:id/claim', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { transaction_signature } = req.body;
+
+        const milestone = await req.prisma.milestone.findUnique({
+            where: { id },
+            include: {
+                project: {
+                    include: {
+                        job: {
+                            select: {
+                                recruiterWallet: true,
+                                freelancerWallet: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!milestone) {
+            return res.status(404).json({ error: 'Milestone not found' });
+        }
+
+        // Check if user is the freelancer for this project
+        if (milestone.project.freelancerId !== req.user!.id) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        if (milestone.status !== 'approved') {
+            return res.status(400).json({ error: 'Milestone must be approved before claiming' });
+        }
+
+        if (milestone.paymentReleased) {
+            return res.status(400).json({ error: 'Milestone payment has already been claimed' });
+        }
+
+        // Update milestone to mark as claimed
+        await req.prisma.milestone.update({
+            where: { id },
+            data: {
+                status: 'claimed',
+                paymentReleased: true,
+                reviewedAt: new Date(),
+                reviewerComments: milestone.reviewerComments || 'Payment claimed by freelancer'
+            }
+        });
+
+        // Record transaction if signature provided
+        if (transaction_signature) {
+            await req.prisma.transaction.create({
+                data: {
+                    fromUserId: milestone.project.recruiterId,
+                    toUserId: milestone.project.freelancerId,
+                    projectId: milestone.projectId,
+                    milestoneId: milestone.id,
+                    type: 'milestone_payment',
+                    amount: milestone.paymentAmount,
+                    walletFrom: milestone.project.job.recruiterWallet || 'unknown',
+                    walletTo: milestone.project.job.freelancerWallet || 'unknown',
+                    walletSignature: transaction_signature,
+                    status: 'confirmed'
+                }
+            });
+        }
+
+        res.json({ message: 'Milestone payment claimed successfully' });
+    } catch (error) {
+        console.error('Claim milestone error:', error);
+        res.status(500).json({ error: 'Failed to claim milestone payment' });
+    }
+});
+
+// Sync milestone status from blockchain to database
+router.post('/milestone/:id/sync', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const milestone = await req.prisma.milestone.findUnique({
+            where: { id },
+            include: {
+                project: {
+                    include: {
+                        job: {
+                            select: {
+                                id: true,
+                                recruiterWallet: true,
+                                freelancerWallet: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!milestone) {
+            return res.status(404).json({ error: 'Milestone not found' });
+        }
+
+        // Verify user has access to this milestone
+        if (req.user!.role === 'recruiter' && milestone.project.recruiterId !== req.user!.id) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+        if (req.user!.role === 'freelancer' && milestone.project.freelancerId !== req.user!.id) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        if (!milestone.project.job.recruiterWallet) {
+            return res.status(400).json({ error: 'Job does not have recruiter wallet address' });
+        }
+
+        // Get escrow details from blockchain
+        const escrowDetails = await getEscrowDetails(
+            milestone.project.job.recruiterWallet,
+            milestone.project.job.id
+        );
+
+        if (!escrowDetails.success || !escrowDetails.milestones) {
+            return res.status(400).json({ error: 'Failed to get escrow details from blockchain' });
+        }
+
+        const milestoneIndex = milestone.stageNumber - 1; // Convert to 0-indexed
+        if (milestoneIndex < 0 || milestoneIndex >= escrowDetails.milestones.length) {
+            return res.status(400).json({ error: 'Invalid milestone index' });
+        }
+
+        const onChainMilestone = escrowDetails.milestones[milestoneIndex];
+        let updated = false;
+        const updates: any = {};
+
+        // Check if milestone is approved on blockchain but not in database
+        if (onChainMilestone.approved && milestone.status !== 'approved') {
+            updates.status = 'approved';
+            updates.reviewedAt = new Date();
+            updates.reviewerComments = updates.reviewerComments || 'Approved on blockchain';
+            updated = true;
+        }
+
+        // Check if milestone is claimed on blockchain but not marked as paid in database
+        if (onChainMilestone.claimed && !milestone.paymentReleased) {
+            updates.status = 'claimed';
+            updates.paymentReleased = true;
+            updates.reviewedAt = new Date();
+            updates.reviewerComments = updates.reviewerComments || 'Payment claimed on blockchain';
+            updated = true;
+        }
+
+        if (updated) {
+            await req.prisma.milestone.update({
+                where: { id },
+                data: updates
+            });
+
+            res.json({
+                message: 'Milestone status synchronized with blockchain',
+                updated: true,
+                changes: updates
+            });
+        } else {
+            res.json({
+                message: 'Milestone status is already in sync with blockchain',
+                updated: false
+            });
+        }
+
+    } catch (error) {
+        console.error('Sync milestone error:', error);
+        res.status(500).json({ error: 'Failed to sync milestone status' });
     }
 });
 

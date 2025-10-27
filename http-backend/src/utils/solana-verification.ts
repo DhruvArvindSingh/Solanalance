@@ -1,4 +1,4 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { AnchorProvider, Program } from '@coral-xyz/anchor';
 import idl from './freelance_platform_idl.json';
 
@@ -27,7 +27,7 @@ async function hashJobIdAsync(jobId: string): Promise<Uint8Array> {
 /**
  * Derive escrow PDA for a given recruiter and job ID
  */
-async function deriveEscrowPDA(
+export async function deriveEscrowPDA(
     recruiterPubkey: PublicKey,
     jobId: string
 ): Promise<[PublicKey, number]> {
@@ -60,7 +60,7 @@ export async function verifyEscrowTransaction(
     totalStaked?: number;
     recruiterWallet?: string;
     freelancerWallet?: string;
-    milestones?: number[];
+    milestones?: Array<{ amount: number; approved: boolean; claimed: boolean }>;
     error?: string;
 }> {
     try {
@@ -117,7 +117,11 @@ export async function verifyEscrowTransaction(
                 totalStaked: stakedSOL,
                 recruiterWallet: escrowData.recruiter.toBase58(),
                 freelancerWallet: escrowData.freelancer.toBase58(),
-                milestones: milestoneAmounts
+                milestones: milestoneAmounts.map((amount: any, index: number) => ({
+                    amount: (typeof amount.toNumber === 'function' ? amount.toNumber() : amount) / LAMPORTS_PER_SOL,
+                    approved: escrowData.milestonesApproved[index],
+                    claimed: escrowData.milestonesClaimed[index]
+                }))
             };
 
         } catch (fetchError) {
@@ -133,6 +137,115 @@ export async function verifyEscrowTransaction(
 
     } catch (error) {
         console.error('Escrow verification error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        };
+    }
+}
+
+/**
+ * Get escrow details for an active job
+ * 
+ * @param recruiterWallet - Recruiter's wallet address
+ * @param jobId - Job ID from database
+ * @returns Escrow details including PDA and current funds
+ */
+export async function getEscrowDetails(
+    recruiterWallet: string,
+    jobId: string
+): Promise<{
+    success: boolean;
+    escrowPDA?: string;
+    currentFunds?: number;
+    recruiterWallet?: string;
+    freelancerWallet?: string;
+    milestones?: Array<{ amount: number; approved: boolean; claimed: boolean }>;
+    error?: string;
+}> {
+    try {
+        if (!recruiterWallet) {
+            return { success: false, error: "Recruiter wallet address is required" };
+        }
+
+        const recruiterPubkey = new PublicKey(recruiterWallet);
+        const [escrowPDA] = await deriveEscrowPDA(recruiterPubkey, jobId);
+
+        console.log(`Getting escrow details for job ${jobId}`);
+        console.log(`Escrow PDA: ${escrowPDA.toBase58()}`);
+
+        // Check if escrow account exists
+        const accountInfo = await connection.getAccountInfo(escrowPDA);
+
+        if (!accountInfo) {
+            return {
+                success: true,
+                escrowPDA: escrowPDA.toBase58(),
+                currentFunds: 0,
+                error: "Escrow account does not exist. Funds have not been staked yet."
+            };
+        }
+
+        // Get account balance
+        const balance = await connection.getBalance(escrowPDA);
+        const currentFunds = lamportsToSol(balance);
+
+        console.log(`✓ Escrow balance: ${currentFunds.toFixed(4)} SOL`);
+
+        // Try to fetch escrow data using Anchor
+        try {
+            // Create a dummy wallet for read-only operations
+            const dummyWallet = {
+                publicKey: recruiterPubkey,
+                signTransaction: async (tx: any) => tx,
+                signAllTransactions: async (txs: any) => txs,
+            };
+
+            const provider = new AnchorProvider(
+                connection,
+                dummyWallet as any,
+                AnchorProvider.defaultOptions()
+            );
+
+            const program = new Program(idl as any, provider);
+            const escrowData = await (program.account as any).escrow.fetch(escrowPDA);
+
+            const milestoneAmounts = escrowData.milestoneAmounts.map((bn: any) =>
+                lamportsToSol(bn.toNumber())
+            );
+
+            console.log(`✓ Escrow data fetched successfully`);
+            console.log(`  Recruiter: ${escrowData.recruiter.toBase58()}`);
+            console.log(`  Freelancer: ${escrowData.freelancer.toBase58()}`);
+            console.log(`  Milestone Amounts: ${milestoneAmounts.join(', ')} SOL`);
+
+            return {
+                success: true,
+                escrowPDA: escrowPDA.toBase58(),
+                currentFunds,
+                recruiterWallet: escrowData.recruiter.toBase58(),
+                freelancerWallet: escrowData.freelancer.toBase58(),
+                milestones: milestoneAmounts.map((amount: any, index: number) => ({
+                    amount: (typeof amount.toNumber === 'function' ? amount.toNumber() : amount) / LAMPORTS_PER_SOL,
+                    approved: escrowData.milestonesApproved[index],
+                    claimed: escrowData.milestonesClaimed[index]
+                }))
+            };
+
+        } catch (fetchError) {
+            console.error('Could not fetch escrow data:', fetchError);
+
+            // Account exists but we can't read it - still return basic info
+            return {
+                success: true,
+                escrowPDA: escrowPDA.toBase58(),
+                currentFunds,
+                error: 'Account exists but data could not be decoded'
+            };
+        }
+
+    } catch (error) {
+        console.error('Escrow details error:', error);
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error'

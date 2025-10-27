@@ -124,6 +124,8 @@ model Job {
   status               JobStatus       @default(open)
   viewsCount           Int             @default(0) @map("views_count")
   selectedFreelancerId String?         @map("selected_freelancer_id") @db.Uuid
+  recruiterWallet      String?         @map("recruiter_wallet")
+  freelancerWallet     String?         @map("freelancer_wallet")
   closedAt             DateTime?       @map("closed_at") @db.Timestamptz(6)
   createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)

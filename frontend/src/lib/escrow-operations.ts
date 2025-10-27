@@ -77,6 +77,8 @@ export async function fundJob(
         const totalAmount = milestones.reduce((a, b) => a + b, 0);
 
         const program = getProgram(wallet);
+        console.log("3. Recruiter Key = ", wallet.publicKey.toString());
+        console.log("3. Job ID = ", jobId);
         const [escrowPDA] = await deriveEscrowPDA(wallet.publicKey, jobId);
 
         // Check if escrow already exists
@@ -257,6 +259,8 @@ export async function approveMilestone(
         }
 
         const program = getProgram(wallet);
+        console.log("4. Recruiter Key = ", wallet.publicKey.toString());
+        console.log("4. Job ID = ", jobId);
         const [escrowPDA] = await deriveEscrowPDA(wallet.publicKey, jobId);
 
         const tx = await program.methods
@@ -287,6 +291,7 @@ export async function approveMilestone(
     }
 }
 
+
 /**
  * Claim Milestone - Freelancer claims payment for approved work
  * Call this when: Freelancer sees approved milestone and clicks "Claim Payment"
@@ -303,20 +308,96 @@ export async function claimMilestone(
     recruiterWallet: string,
     milestoneIndex: number
 ): Promise<EscrowOperationResult> {
+    console.log("=== ESCROW CLAIM MILESTONE START ===");
+    console.log("Input params:", {
+        jobId,
+        recruiterWallet,
+        milestoneIndex,
+        freelancerWallet: wallet.publicKey?.toBase58()
+    });
+
     try {
         if (!wallet.publicKey) {
+            console.error("Wallet not connected");
             return { success: false, error: "Wallet not connected" };
         }
 
         if (milestoneIndex < 0 || milestoneIndex > 2) {
+            console.error("Invalid milestone index:", milestoneIndex);
             return { success: false, error: "Milestone index must be 0, 1, or 2" };
         }
 
+        console.log("Getting program...");
         const program = getProgram(wallet);
-        const [escrowPDA] = await deriveEscrowPDA(
-            new PublicKey(recruiterWallet),
-            jobId
-        );
+        console.log("Program ID:", PROGRAM_ID.toBase58());
+
+        console.log("Deriving escrow PDA...");
+        const recruiterPubkey = new PublicKey(recruiterWallet);
+        console.log("Recruiter pubkey:", recruiterPubkey.toBase58());
+
+        const [escrowPDA] = await deriveEscrowPDA(recruiterPubkey, jobId);
+        console.log("Escrow PDA:", escrowPDA.toBase58());
+
+        // Check if escrow account exists
+        console.log("Checking if escrow account exists...");
+        const escrowAccount = await connection.getAccountInfo(escrowPDA);
+
+        if (!escrowAccount) {
+            console.error("Escrow account does not exist!");
+            return {
+                success: false,
+                error: "Escrow account does not exist. Funds have not been staked yet.",
+                escrowPDA: escrowPDA.toBase58()
+            };
+        }
+
+        console.log("Escrow account found:", {
+            owner: escrowAccount.owner.toBase58(),
+            lamports: escrowAccount.lamports,
+            dataLength: escrowAccount.data.length
+        });
+
+        // Try to fetch and decode escrow data
+        try {
+            console.log("Fetching escrow data...");
+            const escrowData = await (program.account as any).escrow.fetch(escrowPDA);
+            console.log("Escrow data:", {
+                recruiter: escrowData.recruiter.toBase58(),
+                freelancer: escrowData.freelancer.toBase58(),
+                jobId: escrowData.jobId,
+                milestoneAmounts: escrowData.milestoneAmounts.map((amt: any) => amt.toString()),
+                milestonesApproved: escrowData.milestonesApproved,
+                milestonesClaimed: escrowData.milestonesClaimed
+            });
+
+            // Verify milestone is approved
+            if (!escrowData.milestonesApproved[milestoneIndex]) {
+                console.error(`Milestone ${milestoneIndex} is not approved yet`);
+                return {
+                    success: false,
+                    error: `Milestone ${milestoneIndex + 1} has not been approved by the recruiter yet`
+                };
+            }
+
+            // Verify milestone not already claimed
+            if (escrowData.milestonesClaimed[milestoneIndex]) {
+                console.error(`Milestone ${milestoneIndex} already claimed`);
+                return {
+                    success: false,
+                    error: `Milestone ${milestoneIndex + 1} has already been claimed`
+                };
+            }
+
+            console.log(`Milestone ${milestoneIndex} is approved and not yet claimed. Proceeding...`);
+        } catch (fetchError: any) {
+            console.error("Error fetching escrow data:", fetchError);
+            console.error("This might indicate the escrow account structure is invalid");
+        }
+
+        console.log("Calling claimMilestone on smart contract...");
+
+        // Get fresh blockhash to avoid stale transaction issues
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
 
         const tx = await program.methods
             .claimMilestone(milestoneIndex)
@@ -324,7 +405,13 @@ export async function claimMilestone(
                 escrow: escrowPDA,
                 freelancer: wallet.publicKey,
             })
-            .rpc();
+            .rpc({
+                commitment: 'confirmed',
+                preflightCommitment: 'confirmed'
+            });
+
+        console.log("Transaction successful:", tx);
+        console.log("=== ESCROW CLAIM MILESTONE END (SUCCESS) ===");
 
         return {
             success: true,
@@ -332,7 +419,12 @@ export async function claimMilestone(
             message: `Milestone ${milestoneIndex + 1} payment claimed successfully!`,
         };
     } catch (error: any) {
-        console.error("Error claiming milestone:", error);
+        console.error("=== ESCROW CLAIM MILESTONE ERROR ===");
+        console.error("Error type:", error.constructor?.name);
+        console.error("Error message:", error.message);
+        console.error("Error logs:", error.logs);
+        console.error("Full error:", error);
+        console.error("=== ESCROW CLAIM MILESTONE END (ERROR) ===");
 
         // Parse specific errors
         if (error.message?.includes("MilestoneNotApproved")) {
@@ -340,6 +432,15 @@ export async function claimMilestone(
         }
         if (error.message?.includes("MilestoneAlreadyClaimed")) {
             return { success: false, error: "This milestone has already been claimed" };
+        }
+        if (error.message?.includes("Account does not exist")) {
+            return { success: false, error: "Escrow account does not exist. Funds have not been staked yet." };
+        }
+        if (error.message?.includes("already been processed") || error.message?.includes("Transaction simulation failed")) {
+            return { success: false, error: "This milestone payment has already been processed. Please refresh the page to see the updated status." };
+        }
+        if (error.message?.includes("SendTransactionError")) {
+            return { success: false, error: "Transaction failed to send. This might be due to network issues or the transaction already being processed." };
         }
 
         return {
@@ -428,6 +529,7 @@ export async function cancelJob(
         }
 
         const program = getProgram(wallet);
+
         const [escrowPDA] = await deriveEscrowPDA(wallet.publicKey, jobId);
 
         const tx = await program.methods
@@ -502,24 +604,25 @@ export async function getMilestoneStatus(
  * 
  * Use this to verify that funds are properly locked on-chain for a job
  * 
- * @param wallet - Connected wallet adapter instance (recruiter)
+ * @param recruiterWallet - Recruiter's wallet address (who created the escrow)
  * @param jobId - Job ID from database
  * @param expectedFreelancer - Expected freelancer wallet address
  * @param expectedAmount - Expected total amount in SOL
  * @returns Verification result with escrow details
  */
 export async function verifyEscrowFunds(
-    wallet: any,
+    recruiterWallet: string,
     jobId: string,
     expectedFreelancer?: string,
     expectedAmount?: number
 ): Promise<EscrowVerificationResult> {
     try {
-        if (!wallet.publicKey) {
-            return { verified: false, error: "Wallet not connected" };
+        if (!recruiterWallet) {
+            return { verified: false, error: "Recruiter wallet address is required" };
         }
 
-        const [escrowPDA] = await deriveEscrowPDA(wallet.publicKey, jobId);
+        const recruiterPubkey = new PublicKey(recruiterWallet);
+        const [escrowPDA] = await deriveEscrowPDA(recruiterPubkey, jobId);
 
         console.log("Verifying escrow funds...");
         console.log(`Escrow PDA: ${escrowPDA.toBase58()}`);
@@ -537,8 +640,13 @@ export async function verifyEscrowFunds(
 
         console.log("✓ Escrow account exists");
 
-        // Fetch escrow data
-        const program = getProgram(wallet);
+        // Fetch escrow data using dummy wallet (read-only operation)
+        const dummyWallet = {
+            publicKey: recruiterPubkey,
+            signTransaction: async (tx: any) => tx,
+            signAllTransactions: async (txs: any) => txs,
+        };
+        const program = getProgram(dummyWallet);
         const escrowData = await (program.account as any).escrow.fetch(escrowPDA);
 
         // Get escrow balance

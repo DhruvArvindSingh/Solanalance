@@ -68,7 +68,7 @@ class ApiClient {
                     console.warn('Authentication failed, clearing token');
                     this.setToken(null);
                 }
-                
+
                 return {
                     data: null,
                     error: result.error || 'An error occurred'
@@ -278,6 +278,19 @@ class ApiClient {
             return this.request(`/projects/milestone/${milestoneId}/review`, {
                 method: 'PUT',
                 body: JSON.stringify(data),
+            });
+        },
+
+        claimMilestone: async (milestoneId: string, data: any) => {
+            return this.request(`/projects/milestone/${milestoneId}/claim`, {
+                method: 'PUT',
+                body: JSON.stringify(data),
+            });
+        },
+
+        syncMilestone: async (milestoneId: string) => {
+            return this.request(`/projects/milestone/${milestoneId}/sync`, {
+                method: 'POST',
             });
         },
     };
