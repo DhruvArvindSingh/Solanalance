@@ -249,6 +249,7 @@ export async function approveMilestone(
     jobId: string,
     milestoneIndex: number
 ): Promise<EscrowOperationResult> {
+    console.log("approveMilestone called with params:", { wallet, jobId, milestoneIndex });
     try {
         if (!wallet.publicKey) {
             return { success: false, error: "Wallet not connected" };

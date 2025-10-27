@@ -247,6 +247,7 @@ export default function JobDetail() {
     };
 
     const handleApproveMilestone = async (milestone: Milestone) => {
+        console.log("\n\nhandleApproveMilestone called with milestone:", milestone);
         if (!publicKey) {
             toast.error("Please connect your wallet to approve milestone");
             return;
@@ -258,7 +259,7 @@ export default function JobDetail() {
         }
 
         if (!job.recruiter_wallet) {
-            toast.error("Cannot approve milestone: Escrow has not been funded yet. Please fund the escrow first to enable milestone approvals.");
+            toast.error("Cannot approve milestone: Recruiter's wallet not found.");
             return;
         }
 
@@ -289,9 +290,17 @@ export default function JobDetail() {
             // Import the getMilestoneStatus function to check on-chain state
             const { getMilestoneStatus } = await import("@/lib/escrow-operations");
             const milestoneStatuses = await getMilestoneStatus(job.recruiter_wallet, job.id);
+            console.log("milestoneStatuses", milestoneStatuses);
 
             if (milestoneStatuses && milestoneStatuses[milestoneIndex]) {
                 const onChainStatus = milestoneStatuses[milestoneIndex];
+                if (onChainStatus.claimed) {
+                    toast.error("This milestone has already been claimed by the freelancer. Refreshing page to sync status...");
+                    setTimeout(() => {
+                        fetchJobDetails();
+                    }, 1500);
+                    return;
+                }
                 if (onChainStatus.approved) {
                     toast.error("This milestone has already been approved on the blockchain. Refreshing page to sync status...");
                     setTimeout(() => {
@@ -303,6 +312,7 @@ export default function JobDetail() {
 
             // Call smart contract to approve milestone
             toast.info("Approving milestone on blockchain...");
+
             const result = await approveMilestone(
                 wallet,
                 job.id,

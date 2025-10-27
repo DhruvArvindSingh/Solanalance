@@ -298,7 +298,7 @@ router.put('/milestone/:id/review', authenticateToken, async (req, res) => {
                 where: { id },
                 data: {
                     status: 'approved',
-                    paymentReleased: true,
+                    paymentReleased: false,
                     reviewedAt: new Date(),
                     reviewerComments: comments
                 }
