@@ -11,6 +11,7 @@ import { Plus, Briefcase, Users, TrendingUp, Coins } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { VerifyFundsButton } from "@/components/VerifyFundsButton";
+import { SyncBlockchainButton } from "@/components/SyncBlockchainButton";
 
 interface JobWithStats {
     id: string;
@@ -263,15 +264,22 @@ export default function RecruiterDashboard() {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Show Verify Funds button for active jobs */}
-                                                            {job.status === "active" && job.recruiter_wallet && (
-                                                                <div onClick={(e) => e.stopPropagation()}>
-                                                                    <VerifyFundsButton
+                                                            {/* Show Verify Funds and Sync Blockchain buttons for active jobs */}
+                                                            {job.status === "active" && (
+                                                                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                                                    {job.recruiter_wallet && (
+                                                                        <VerifyFundsButton
+                                                                            jobId={job.id}
+                                                                            jobTitle={job.title}
+                                                                            recruiterWallet={job.recruiter_wallet}
+                                                                            freelancerWallet={job.freelancer_wallet}
+                                                                            expectedAmount={job.total_payment}
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                        />
+                                                                    )}
+                                                                    <SyncBlockchainButton
                                                                         jobId={job.id}
-                                                                        jobTitle={job.title}
-                                                                        recruiterWallet={job.recruiter_wallet}
-                                                                        freelancerWallet={job.freelancer_wallet}
-                                                                        expectedAmount={job.total_payment}
                                                                         variant="outline"
                                                                         size="sm"
                                                                     />

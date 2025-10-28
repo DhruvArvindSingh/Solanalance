@@ -16,8 +16,10 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RatingModal } from "@/components/RatingModal";
 import { VerifyFundsButton } from "@/components/VerifyFundsButton";
+import { SyncBlockchainButton } from "@/components/SyncBlockchainButton";
 import { useMessagingStore } from "@/stores/messagingStore";
 import { useEscrowWithVerification } from "@/hooks/useEscrowWithVerification";
+import { getMilestoneStatus } from "@/lib/escrow-operations";
 import {
     ArrowLeft,
     CheckCircle,
@@ -30,6 +32,7 @@ import {
     Download,
     ExternalLink,
     Edit,
+    RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -50,6 +53,18 @@ interface Milestone {
         name: string;
         description: string | null;
     };
+}
+
+interface EscrowData {
+    initialStaked: number;
+    currentStaked: number;
+    claimable: number;
+    released: number;
+    milestones: Array<{
+        amount: number;
+        approved: boolean;
+        claimed: boolean;
+    }>;
 }
 
 interface Project {
@@ -93,6 +108,8 @@ export default function ProjectWorkspace() {
     const [milestones, setMilestones] = useState<Milestone[]>([]);
     const [loading, setLoading] = useState(true);
     const [recruiterWallet, setRecruiterWallet] = useState<string>("");
+    const [escrowData, setEscrowData] = useState<EscrowData | null>(null);
+    const [isLoadingEscrow, setIsLoadingEscrow] = useState(false);
 
     // Submission state - track per milestone
     const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
@@ -123,13 +140,20 @@ export default function ProjectWorkspace() {
         fetchProjectData();
     }, [id, user]);
 
+    // Fetch escrow data when project and recruiter wallet are available
+    useEffect(() => {
+        if (project && recruiterWallet) {
+            fetchEscrowData();
+        }
+    }, [project, recruiterWallet]);
+
     // Pre-populate form data for revision_requested milestones
     useEffect(() => {
-        if (project?.milestones) {
+        if (milestones.length > 0) {
             const newDescriptions: { [key: string]: string } = {};
             const newLinks: { [key: string]: string } = {};
 
-            project.milestones.forEach(milestone => {
+            milestones.forEach(milestone => {
                 if (milestone.status === 'revision_requested' && milestone.submission_description) {
                     newDescriptions[milestone.id] = milestone.submission_description;
                     newLinks[milestone.id] = (milestone.submission_links || []).join('\n');
@@ -143,7 +167,7 @@ export default function ProjectWorkspace() {
                 setSubmissionLinks(prev => ({ ...prev, ...newLinks }));
             }
         }
-    }, [project?.milestones]);
+    }, [milestones]);
 
     const fetchProjectData = async () => {
         if (!id || !user) return;
@@ -216,6 +240,58 @@ export default function ProjectWorkspace() {
             toast.error("Failed to load project");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchEscrowData = async () => {
+        if (!project || !recruiterWallet) return;
+
+        setIsLoadingEscrow(true);
+        try {
+            // Fetch milestone status from blockchain
+            const milestoneStatuses = await getMilestoneStatus(recruiterWallet, project.job_id);
+
+            if (milestoneStatuses && milestoneStatuses.length > 0) {
+                // Calculate values from blockchain data
+                const totalInitialStaked = milestoneStatuses.reduce((sum, milestone) => sum + milestone.amount, 0);
+                const totalClaimed = milestoneStatuses.reduce((sum, milestone) =>
+                    milestone.claimed ? sum + milestone.amount : sum, 0);
+                const totalClaimable = milestoneStatuses.reduce((sum, milestone) =>
+                    milestone.approved && !milestone.claimed ? sum + milestone.amount : sum, 0);
+
+                // Current staked is initial staked minus what's been claimed
+                const currentStaked = totalInitialStaked - totalClaimed;
+
+                setEscrowData({
+                    initialStaked: totalInitialStaked,
+                    currentStaked: currentStaked,
+                    claimable: totalClaimable,
+                    released: totalClaimed,
+                    milestones: milestoneStatuses
+                });
+            } else {
+                // No escrow data available yet
+                setEscrowData({
+                    initialStaked: 0,
+                    currentStaked: 0,
+                    claimable: 0,
+                    released: 0,
+                    milestones: []
+                });
+            }
+        } catch (error) {
+            console.error("Error fetching escrow data:", error);
+            toast.error("Failed to fetch escrow data");
+            // Set default values on error
+            setEscrowData({
+                initialStaked: 0,
+                currentStaked: 0,
+                claimable: 0,
+                released: 0,
+                milestones: []
+            });
+        } finally {
+            setIsLoadingEscrow(false);
         }
     };
 
@@ -342,6 +418,7 @@ export default function ProjectWorkspace() {
                     toast.success("Milestone approved! Freelancer can now claim payment.");
                     setReviewComments("");
                     fetchProjectData();
+                    fetchEscrowData();
 
                     // If this was the final milestone, show rating modal
                     if (milestone.stage_number === 3) {
@@ -514,9 +591,10 @@ export default function ProjectWorkspace() {
                 console.log("Backend updated successfully");
             }
 
-            // Refresh project data
+            // Refresh project data and escrow data
             console.log("Refreshing project data...");
             fetchProjectData();
+            fetchEscrowData();
             console.log("=== CLAIM MILESTONE DEBUG END (SUCCESS) ===");
         } catch (error: any) {
             console.error("=== CLAIM MILESTONE ERROR ===");
@@ -602,14 +680,23 @@ export default function ProjectWorkspace() {
                                 Started {formatDistanceToNow(new Date(project.started_at))} ago
                             </p>
                         </div>
-                        {/* Verify Funds Button for Freelancers on Active Jobs */}
-                        {!isRecruiter && project.status === "active" && recruiterWallet && (
-                            <div className="ml-4">
-                                <VerifyFundsButton
+                        {/* Action Buttons for Active Jobs */}
+                        {project.status === "active" && (
+                            <div className="ml-4 flex gap-2">
+                                {/* Verify Funds Button for Freelancers */}
+                                {!isRecruiter && recruiterWallet && (
+                                    <VerifyFundsButton
+                                        jobId={project.job.id}
+                                        jobTitle={project.job.title}
+                                        recruiterWallet={recruiterWallet}
+                                        expectedAmount={project.job.total_payment}
+                                        variant="outline"
+                                        size="default"
+                                    />
+                                )}
+                                {/* Sync Blockchain Button for all users */}
+                                <SyncBlockchainButton
                                     jobId={project.job.id}
-                                    jobTitle={project.job.title}
-                                    recruiterWallet={recruiterWallet}
-                                    expectedAmount={project.job.total_payment}
                                     variant="outline"
                                     size="default"
                                 />
@@ -1230,7 +1317,18 @@ export default function ProjectWorkspace() {
                         {/* Payment Summary */}
                         <Card className="glass border-white/10">
                             <CardHeader>
-                                <CardTitle>Payment Summary</CardTitle>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle>Payment Summary</CardTitle>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={fetchEscrowData}
+                                        disabled={isLoadingEscrow}
+                                        className="h-8 w-8 p-0"
+                                    >
+                                        <RefreshCw className={`w-4 h-4 ${isLoadingEscrow ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-3">
@@ -1243,26 +1341,37 @@ export default function ProjectWorkspace() {
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Staked:</span>
+                                        <span className="text-muted-foreground">Initial Staked:</span>
+                                        <span className="font-semibold text-blue-500">
+                                            {escrowData ? escrowData.initialStaked.toFixed(2) : '0.00'} SOL
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Current Staked:</span>
                                         <span className="font-semibold text-warning">
-                                            {project.staking.total_staked.toFixed(2)} SOL
+                                            {escrowData ? escrowData.currentStaked.toFixed(2) : project.staking.total_staked.toFixed(2)} SOL
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Claimable:</span>
+                                        <span className="font-semibold text-purple-500">
+                                            {escrowData ? escrowData.claimable.toFixed(2) : '0.00'} SOL
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">Released:</span>
                                         <span className="font-semibold text-success">
-                                            {project.staking.total_released.toFixed(2)} SOL
+                                            {escrowData ? escrowData.released.toFixed(2) : project.staking.total_released.toFixed(2)} SOL
                                         </span>
                                     </div>
                                     <Separator />
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Remaining:</span>
                                         <span className="text-xl font-bold text-gradient">
-                                            {(
-                                                project.staking.total_staked -
-                                                project.staking.total_released
-                                            ).toFixed(2)}{" "}
-                                            SOL
+                                            {escrowData ?
+                                                (escrowData.currentStaked - escrowData.claimable).toFixed(2) :
+                                                (project.staking.total_staked - project.staking.total_released).toFixed(2)
+                                            } SOL
                                         </span>
                                     </div>
                                 </div>

@@ -290,7 +290,28 @@ export default function JobDetail() {
             // Import the getMilestoneStatus function to check on-chain state
             const { getMilestoneStatus } = await import("@/lib/escrow-operations");
             const milestoneStatuses = await getMilestoneStatus(job.recruiter_wallet, job.id);
-            console.log("milestoneStatuses", milestoneStatuses);
+            console.log("milestoneStatuses", milestoneStatuses[milestoneIndex]);
+            console.log("milestoneIndex", milestoneIndex);
+            if (milestoneStatuses && milestoneStatuses[milestoneIndex].approved) {
+                toast.error("This milestone has already been approved on the blockchain. Refreshing page to sync status...");
+                setIsApproving(false);
+                // Sync backend with blockchain state
+                try {
+                    await apiClient.projects.syncWithBlockchain({
+                        jobId: job.id,
+                        recruiterWallet: job.recruiter_wallet
+                    });
+                } catch (syncError) {
+                    console.error("Failed to sync with blockchain:", syncError);
+                    toast.error("Failed to sync with blockchain. Please refresh the page to see the updated status.");
+                }
+                setTimeout(() => {
+                    fetchJobDetails();
+                }, 1500);
+                return;
+
+
+            }
 
             if (milestoneStatuses && milestoneStatuses[milestoneIndex]) {
                 const onChainStatus = milestoneStatuses[milestoneIndex];

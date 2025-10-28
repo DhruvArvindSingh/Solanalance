@@ -580,4 +580,173 @@ router.post('/milestone/:id/sync', authenticateToken, async (req, res) => {
     }
 });
 
+// Sync project with blockchain data
+router.post('/sync-blockchain', authenticateToken, async (req, res) => {
+    try {
+        const { jobId, recruiterWallet } = req.body;
+
+        if (!jobId || !recruiterWallet) {
+            return res.status(400).json({ error: 'jobId and recruiterWallet are required' });
+        }
+
+        // Find the project for this job
+        const project = await req.prisma.project.findFirst({
+            where: {
+                jobId,
+                OR: [
+                    { recruiterId: req.user!.id },
+                    { freelancerId: req.user!.id }
+                ]
+            },
+            include: {
+                milestones: {
+                    orderBy: { stageNumber: 'asc' }
+                },
+                job: {
+                    select: {
+                        id: true,
+                        recruiterWallet: true,
+                        freelancerWallet: true
+                    }
+                }
+            }
+        });
+
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        // Get escrow details from blockchain
+        const escrowDetails = await getEscrowDetails(recruiterWallet, jobId);
+
+        if (!escrowDetails.success) {
+            return res.status(400).json({
+                error: 'Failed to get escrow details from blockchain',
+                details: escrowDetails.error
+            });
+        }
+
+        if (!escrowDetails.milestones) {
+            return res.status(400).json({
+                error: 'No milestone data found on blockchain'
+            });
+        }
+
+        // Track what was updated
+        const updates: any = {
+            milestonesUpdated: 0,
+            changes: []
+        };
+
+        // Sync each milestone with blockchain data
+        for (let i = 0; i < project.milestones.length && i < escrowDetails.milestones.length; i++) {
+            const dbMilestone = project.milestones[i];
+            const onChainMilestone = escrowDetails.milestones[i];
+
+            let milestoneUpdated = false;
+            const milestoneUpdates: any = {};
+
+            // Check if milestone is approved on blockchain but not in database
+            if (onChainMilestone.approved && dbMilestone.status !== 'approved' && dbMilestone.status !== 'claimed') {
+                milestoneUpdates.status = 'approved';
+                milestoneUpdates.reviewedAt = new Date();
+                milestoneUpdates.reviewerComments = milestoneUpdates.reviewerComments || 'Approved on blockchain';
+                milestoneUpdated = true;
+                updates.changes.push(`Milestone ${i + 1}: marked as approved`);
+            }
+
+            // Check if milestone is claimed on blockchain but not marked as paid in database
+            if (onChainMilestone.claimed && !dbMilestone.paymentReleased) {
+                milestoneUpdates.status = 'claimed';
+                milestoneUpdates.paymentReleased = true;
+                milestoneUpdates.reviewedAt = new Date();
+                milestoneUpdates.reviewerComments = milestoneUpdates.reviewerComments || 'Payment claimed on blockchain';
+                milestoneUpdated = true;
+                updates.changes.push(`Milestone ${i + 1}: marked as claimed`);
+            }
+
+            if (milestoneUpdated) {
+                await req.prisma.milestone.update({
+                    where: { id: dbMilestone.id },
+                    data: milestoneUpdates
+                });
+                updates.milestonesUpdated++;
+            }
+        }
+
+        // Update project stage based on approved milestones
+        const approvedMilestones = project.milestones.filter(m =>
+            escrowDetails.milestones![m.stageNumber - 1]?.approved
+        );
+
+        if (approvedMilestones.length > 0) {
+            const highestApprovedStage = Math.max(...approvedMilestones.map(m => m.stageNumber));
+            if (highestApprovedStage > project.currentStage) {
+                await req.prisma.project.update({
+                    where: { id: project.id },
+                    data: { currentStage: Math.min(highestApprovedStage + 1, 3) }
+                });
+                updates.changes.push(`Project stage updated to ${Math.min(highestApprovedStage + 1, 3)}`);
+            }
+        }
+
+        // Check if all milestones are claimed (project completed)
+        const allMilestonesClaimed = escrowDetails.milestones.every(m => m.claimed);
+        if (allMilestonesClaimed && project.status !== 'completed') {
+            await req.prisma.project.update({
+                where: { id: project.id },
+                data: {
+                    status: 'completed',
+                    completedAt: new Date()
+                }
+            });
+
+            await req.prisma.job.update({
+                where: { id: jobId },
+                data: { status: 'completed' }
+            });
+
+            updates.changes.push('Project marked as completed');
+        }
+
+        // Update staking record with current funds
+        if (escrowDetails.currentFunds !== undefined) {
+            const staking = await req.prisma.staking.findFirst({
+                where: { projectId: project.id }
+            });
+
+            if (staking) {
+                const claimedAmount = escrowDetails.milestones
+                    .filter(m => m.claimed)
+                    .reduce((sum, m) => sum + m.amount, 0);
+
+                await req.prisma.staking.update({
+                    where: { id: staking.id },
+                    data: {
+                        totalReleased: claimedAmount
+                    }
+                });
+                updates.changes.push(`Staking record updated: ${claimedAmount} SOL released`);
+            }
+        }
+
+        res.json({
+            message: 'Project synchronized with blockchain successfully',
+            updated: updates.milestonesUpdated > 0 || updates.changes.length > 0,
+            escrowData: {
+                pda: escrowDetails.escrowPDA,
+                currentFunds: escrowDetails.currentFunds,
+                recruiterWallet: escrowDetails.recruiterWallet,
+                freelancerWallet: escrowDetails.freelancerWallet,
+                milestones: escrowDetails.milestones
+            },
+            updates
+        });
+
+    } catch (error) {
+        console.error('Sync blockchain error:', error);
+        res.status(500).json({ error: 'Failed to sync project with blockchain' });
+    }
+});
+
 export default router;

@@ -492,4 +492,197 @@ router.put('/:id', authenticateToken, requireRole('recruiter'), async (req, res)
     }
 });
 
+// Sync job data with blockchain
+router.post('/:id/sync-blockchain', authenticateToken, async (req, res) => {
+    try {
+        const { id: jobId } = req.params;
+        const userId = req.user!.id;
+
+        console.log(`=== BLOCKCHAIN SYNC START for Job ${jobId} ===`);
+
+        // Find the job and verify user has access
+        const job = await req.prisma.job.findFirst({
+            where: {
+                id: jobId,
+                OR: [
+                    { recruiterId: userId },
+                    {
+                        projects: {
+                            some: {
+                                freelancerId: userId
+                            }
+                        }
+                    }
+                ]
+            },
+            include: {
+                projects: {
+                    include: {
+                        stakings: true,
+                        milestones: {
+                            orderBy: { stageNumber: 'asc' }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found or access denied' });
+        }
+
+        if (job.status !== 'active') {
+            return res.status(400).json({ error: 'Can only sync active jobs' });
+        }
+
+        if (!job.recruiterWallet) {
+            return res.status(400).json({ error: 'Job does not have a recruiter wallet address' });
+        }
+
+        console.log(`Job found: ${job.title}, Recruiter wallet: ${job.recruiterWallet}`);
+
+        // Get blockchain data
+        const escrowDetails = await getEscrowDetails(job.recruiterWallet, jobId);
+
+        if (!escrowDetails.success) {
+            console.log(`No escrow found on blockchain: ${escrowDetails.error}`);
+            return res.json({
+                status: 'synced',
+                message: 'No escrow exists on blockchain yet',
+                blockchainData: null,
+                databaseData: job.projects[0]?.stakings[0] || null
+            });
+        }
+
+        console.log('Blockchain escrow data:', escrowDetails);
+
+        const project = job.projects[0];
+        if (!project) {
+            return res.status(400).json({ error: 'No project found for this job' });
+        }
+
+        const currentStaking = project.stakings[0];
+        const milestones = project.milestones;
+
+        // Compare blockchain data with database
+        let needsUpdate = false;
+        const updates: any = {};
+
+        // Check total staked amount
+        const blockchainTotalStaked = escrowDetails.milestones?.reduce((sum: number, m: any) => sum + m.amount, 0) || 0;
+        const dbTotalStaked = currentStaking?.totalStaked ? parseFloat(currentStaking.totalStaked.toString()) : 0;
+
+        if (Math.abs(blockchainTotalStaked - dbTotalStaked) > 0.001) {
+            console.log(`Total staked mismatch: DB=${dbTotalStaked}, Blockchain=${blockchainTotalStaked}`);
+            needsUpdate = true;
+            updates.totalStaked = blockchainTotalStaked;
+        }
+
+        // Check milestone statuses
+        const milestoneUpdates: any[] = [];
+        if (escrowDetails.milestones) {
+            escrowDetails.milestones.forEach((blockchainMilestone: any, index: number) => {
+                const dbMilestone = milestones[index];
+                if (dbMilestone) {
+                    const milestoneUpdate: any = {};
+                    let milestoneNeedsUpdate = false;
+
+                    // Check payment amount
+                    const dbPaymentAmount = parseFloat(dbMilestone.paymentAmount.toString());
+                    if (Math.abs(blockchainMilestone.amount - dbPaymentAmount) > 0.001) {
+                        console.log(`Milestone ${index + 1} amount mismatch: DB=${dbMilestone.paymentAmount}, Blockchain=${blockchainMilestone.amount}`);
+                        milestoneUpdate.paymentAmount = blockchainMilestone.amount;
+                        milestoneNeedsUpdate = true;
+                    }
+
+                    // Check if milestone is claimed on blockchain but not in DB
+                    if (blockchainMilestone.claimed && !dbMilestone.paymentReleased) {
+                        console.log(`Milestone ${index + 1} claimed on blockchain but not in DB`);
+                        milestoneUpdate.paymentReleased = true;
+                        milestoneUpdate.status = 'completed';
+                        milestoneNeedsUpdate = true;
+                        needsUpdate = true;
+                    }
+
+                    // Check if milestone is approved on blockchain but not in DB
+                    if (blockchainMilestone.approved && dbMilestone.status !== 'approved' && !dbMilestone.paymentReleased) {
+                        console.log(`Milestone ${index + 1} approved on blockchain but not in DB`);
+                        milestoneUpdate.status = 'approved';
+                        milestoneNeedsUpdate = true;
+                        needsUpdate = true;
+                    }
+
+                    if (milestoneNeedsUpdate) {
+                        milestoneUpdates.push({
+                            id: dbMilestone.id,
+                            updates: milestoneUpdate
+                        });
+                    }
+                }
+            });
+        }
+
+        // Calculate total released from blockchain
+        const blockchainTotalReleased = escrowDetails.milestones?.reduce((sum: number, m: any) =>
+            m.claimed ? sum + m.amount : sum, 0) || 0;
+        const dbTotalReleased = currentStaking?.totalReleased ? parseFloat(currentStaking.totalReleased.toString()) : 0;
+
+        if (Math.abs(blockchainTotalReleased - dbTotalReleased) > 0.001) {
+            console.log(`Total released mismatch: DB=${dbTotalReleased}, Blockchain=${blockchainTotalReleased}`);
+            needsUpdate = true;
+            updates.totalReleased = blockchainTotalReleased;
+        }
+
+        if (!needsUpdate && milestoneUpdates.length === 0) {
+            console.log('Database is already in sync with blockchain');
+            return res.json({
+                status: 'synced',
+                message: 'Database is already synchronized with blockchain',
+                blockchainData: escrowDetails,
+                databaseData: { staking: currentStaking, milestones }
+            });
+        }
+
+        console.log('Updating database with blockchain data...');
+        console.log('Staking updates:', updates);
+        console.log('Milestone updates:', milestoneUpdates);
+
+        // Perform updates in a transaction
+        await req.prisma.$transaction(async (tx) => {
+            // Update staking if needed
+            if (Object.keys(updates).length > 0) {
+                await tx.staking.update({
+                    where: { id: currentStaking.id },
+                    data: updates
+                });
+            }
+
+            // Update milestones if needed
+            for (const milestoneUpdate of milestoneUpdates) {
+                await tx.milestone.update({
+                    where: { id: milestoneUpdate.id },
+                    data: milestoneUpdate.updates
+                });
+            }
+        });
+
+        console.log('Database updated successfully');
+        console.log(`=== BLOCKCHAIN SYNC END (UPDATED) ===`);
+
+        res.json({
+            status: 'outdated',
+            message: 'Database was outdated and has been updated with blockchain data',
+            updatesApplied: {
+                staking: updates,
+                milestones: milestoneUpdates
+            },
+            blockchainData: escrowDetails
+        });
+
+    } catch (error) {
+        console.error('Blockchain sync error:', error);
+        res.status(500).json({ error: 'Failed to sync with blockchain' });
+    }
+});
+
 export default router;

@@ -293,6 +293,13 @@ class ApiClient {
                 method: 'POST',
             });
         },
+
+        syncWithBlockchain: async (data: { jobId: string; recruiterWallet: string }) => {
+            return this.request('/projects/sync-blockchain', {
+                method: 'POST',
+                body: JSON.stringify(data),
+            });
+        },
     };
 
     // Staking endpoints

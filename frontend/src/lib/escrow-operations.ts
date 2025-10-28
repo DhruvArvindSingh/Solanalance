@@ -30,6 +30,7 @@ export interface EscrowVerificationResult {
     error?: string;
     escrowPDA?: string;
     totalStaked?: number;
+    unclaimedAmount?: number;
 }
 
 /**
@@ -669,23 +670,41 @@ export async function verifyEscrowFunds(
             console.log("✓ Freelancer verified");
         }
 
-        // Verify amount (if provided)
-        if (expectedAmount) {
-            const tolerance = 0.01; // Allow small difference for rent
-            if (stakedSOL < (expectedAmount - tolerance)) {
-                return {
-                    verified: false,
-                    error: `Insufficient funds staked. Expected: ${expectedAmount} SOL, Found: ${stakedSOL.toFixed(4)} SOL`,
-                    escrowPDA: escrowPDA.toBase58(),
-                    balance: stakedSOL
-                };
-            }
-            console.log("✓ Amount verified");
-        }
-
-        // Calculate total milestone amounts
+        // Calculate milestone amounts and unclaimed amounts
         const milestoneAmounts = escrowData.milestoneAmounts.map((bn: any) => lamportsToSol(bn));
         const totalMilestones = milestoneAmounts.reduce((a: number, b: number) => a + b, 0);
+
+        // Calculate unclaimed milestone amounts (approved but not claimed + pending milestones)
+        const unclaimedAmount = milestoneAmounts.reduce((sum: number, amount: number, index: number) => {
+            const isClaimed = escrowData.milestonesClaimed[index];
+            return isClaimed ? sum : sum + amount;
+        }, 0);
+
+        console.log(`Milestone breakdown:`, {
+            milestoneAmounts,
+            milestonesApproved: escrowData.milestonesApproved,
+            milestonesClaimed: escrowData.milestonesClaimed,
+            unclaimedAmount: unclaimedAmount.toFixed(4),
+            stakedSOL: stakedSOL.toFixed(4)
+        });
+
+        // Verify amount against unclaimed milestones (if provided)
+        if (expectedAmount) {
+            const tolerance = 0.01; // Allow small difference for rent
+
+            // Check if staked amount covers the unclaimed milestone amounts
+            if (stakedSOL < (unclaimedAmount - tolerance)) {
+                return {
+                    verified: false,
+                    error: `Insufficient funds for unclaimed milestones. Required: ${unclaimedAmount.toFixed(4)} SOL, Found: ${stakedSOL.toFixed(4)} SOL`,
+                    escrowPDA: escrowPDA.toBase58(),
+                    balance: stakedSOL,
+                    unclaimedAmount,
+                    totalMilestones
+                };
+            }
+            console.log("✓ Amount verified against unclaimed milestones");
+        }
 
         console.log("✓ All verifications passed");
 
@@ -696,6 +715,7 @@ export async function verifyEscrowFunds(
             freelancer: escrowData.freelancer.toBase58(),
             balance: stakedSOL,
             totalStaked: totalMilestones,
+            unclaimedAmount,
             milestoneAmounts,
             milestonesApproved: escrowData.milestonesApproved,
             milestonesClaimed: escrowData.milestonesClaimed

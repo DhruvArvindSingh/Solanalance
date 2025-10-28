@@ -184,6 +184,15 @@ export function VerifyFundsButton({
                                         </span>
                                     </div>
 
+                                    {verificationResult.unclaimedAmount !== undefined && (
+                                        <div className="flex justify-between">
+                                            <span className="text-sm text-gray-600">Unclaimed Required:</span>
+                                            <span className="text-sm font-semibold text-blue-700">
+                                                {verificationResult.unclaimedAmount?.toFixed(4)} SOL
+                                            </span>
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-between">
                                         <span className="text-sm text-gray-600">Recruiter:</span>
                                         <span className="text-sm font-mono text-gray-700">
