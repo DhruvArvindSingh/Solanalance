@@ -36,7 +36,9 @@ router.get('/my-projects', authenticateToken, async (req, res) => {
                         experienceLevel: true,
                         projectDuration: true,
                         status: true,
-                        createdAt: true
+                        createdAt: true,
+                        recruiterWallet: true,
+                        freelancerWallet: true
                     }
                 }
             },
@@ -59,7 +61,9 @@ router.get('/my-projects', authenticateToken, async (req, res) => {
                 experience_level: project.job.experienceLevel || '',
                 duration: project.job.projectDuration || '',
                 status: project.job.status,
-                created_at: project.job.createdAt
+                created_at: project.job.createdAt,
+                recruiter_wallet: project.job.recruiterWallet,
+                freelancer_wallet: project.job.freelancerWallet
             }
         }));
 
@@ -746,6 +750,106 @@ router.post('/sync-blockchain', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Sync blockchain error:', error);
         res.status(500).json({ error: 'Failed to sync project with blockchain' });
+    }
+});
+
+// Get project transactions (staking and milestone claims)
+router.get('/:id/transactions', authenticateToken, async (req, res) => {
+    try {
+        const { id: projectId } = req.params;
+        const userId = req.user!.id;
+
+        // Verify user has access to this project
+        const project = await req.prisma.project.findFirst({
+            where: {
+                id: projectId,
+                OR: [
+                    { recruiterId: userId },
+                    { freelancerId: userId }
+                ]
+            },
+            include: {
+                job: {
+                    select: {
+                        title: true,
+                        recruiterWallet: true,
+                        freelancerWallet: true
+                    }
+                }
+            }
+        });
+
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found or access denied' });
+        }
+
+        // Get all transactions for this project
+        const transactions = await req.prisma.transaction.findMany({
+            where: {
+                projectId: projectId
+            },
+            include: {
+                fromUser: {
+                    select: {
+                        id: true,
+                        fullName: true
+                    }
+                },
+                toUser: {
+                    select: {
+                        id: true,
+                        fullName: true
+                    }
+                },
+                milestone: {
+                    select: {
+                        id: true,
+                        stageNumber: true,
+                        status: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        const transformedTransactions = transactions.map(transaction => ({
+            id: transaction.id,
+            type: transaction.type,
+            amount: parseFloat(transaction.amount.toString()),
+            wallet_signature: transaction.walletSignature,
+            wallet_from: transaction.walletFrom,
+            wallet_to: transaction.walletTo,
+            status: transaction.status,
+            created_at: transaction.createdAt,
+            from_user: {
+                id: transaction.fromUser?.id,
+                name: transaction.fromUser?.fullName || 'Unknown User'
+            },
+            to_user: {
+                id: transaction.toUser?.id,
+                name: transaction.toUser?.fullName || 'Unknown User'
+            },
+            milestone: transaction.milestone ? {
+                id: transaction.milestone.id,
+                stage_number: transaction.milestone.stageNumber,
+                status: transaction.milestone.status
+            } : null,
+            project: {
+                title: project.job.title
+            }
+        }));
+
+        res.json({
+            project_id: projectId,
+            project_title: project.job.title,
+            transactions: transformedTransactions
+        });
+
+    } catch (error) {
+        console.error('Get project transactions error:', error);
+        res.status(500).json({ error: 'Failed to get project transactions' });
     }
 });
 

@@ -1,7 +1,28 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, Zap, TrendingUp } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 
 export const Hero = () => {
+  const { user, userRole } = useAuth();
+  const navigate = useNavigate();
+
+  const handleFreelancerClick = () => {
+    if (!user) {
+      navigate("/auth");
+    } else {
+      navigate("/dashboard/freelancer");
+    }
+  };
+
+  const handleRecruiterClick = () => {
+    if (!user) {
+      navigate("/auth");
+    } else {
+      navigate("/dashboard/recruiter");
+    }
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
       {/* Animated Background */}
@@ -35,13 +56,50 @@ export const Hero = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-16">
-            <Button size="lg" className="bg-gradient-solana hover:opacity-90 border-0 text-base px-8 h-14 w-full sm:w-auto">
-              Start Freelancing
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-            <Button size="lg" variant="outline" className="glass border-white/20 hover:bg-white/5 h-14 w-full sm:w-auto">
-              Post a Job
-            </Button>
+            {/* Show both buttons if user is not signed in */}
+            {!user && (
+              <>
+                <Button
+                  size="lg"
+                  className="bg-gradient-solana hover:opacity-90 border-0 text-base px-8 h-14 w-full sm:w-auto"
+                  onClick={handleFreelancerClick}
+                >
+                  Start Freelancing
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="glass border-white/20 hover:bg-white/5 h-14 w-full sm:w-auto"
+                  onClick={handleRecruiterClick}
+                >
+                  Post a Job
+                </Button>
+              </>
+            )}
+
+            {/* Show role-specific button if user is signed in */}
+            {user && userRole === 'freelancer' && (
+              <Button
+                size="lg"
+                className="bg-gradient-solana hover:opacity-90 border-0 text-base px-8 h-14 w-full sm:w-auto"
+                onClick={handleFreelancerClick}
+              >
+                Start Freelancing
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            )}
+
+            {user && userRole === 'recruiter' && (
+              <Button
+                size="lg"
+                variant="outline"
+                className="glass border-white/20 hover:bg-white/5 h-14 w-full sm:w-auto"
+                onClick={handleRecruiterClick}
+              >
+                Post a Job
+              </Button>
+            )}
           </div>
 
           {/* Feature Pills */}

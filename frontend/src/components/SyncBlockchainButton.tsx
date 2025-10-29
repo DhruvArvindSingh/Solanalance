@@ -9,16 +9,19 @@ interface SyncBlockchainButtonProps {
     variant?: "default" | "outline" | "ghost";
     size?: "default" | "sm" | "lg" | "icon";
     className?: string;
+    showFixPayments?: boolean;
 }
 
 export function SyncBlockchainButton({
     jobId,
     variant = "outline",
     size = "sm",
-    className = ""
+    className = "",
+    showFixPayments = false
 }: SyncBlockchainButtonProps) {
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncStatus, setSyncStatus] = useState<"idle" | "outdated" | "synced">("idle");
+    const [isFixingPayments, setIsFixingPayments] = useState(false);
 
     const handleSync = async () => {
         if (!jobId) {
@@ -74,6 +77,51 @@ export function SyncBlockchainButton({
         }
     };
 
+    const handleFixPayments = async () => {
+        if (!jobId) {
+            toast.error("Job ID is required");
+            return;
+        }
+
+        setIsFixingPayments(true);
+
+        try {
+            console.log("Fixing milestone payments for job:", jobId);
+
+            const response = await apiClient.request(`/jobs/${jobId}/fix-milestone-payments`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.error) {
+                throw new Error(response.error);
+            }
+
+            const result = response.data;
+            console.log("Fix payments result:", result);
+
+            if (result.success) {
+                toast.success(result.message);
+
+                // Reload page to show updated amounts
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                toast.warning(result.message);
+            }
+
+        } catch (error: any) {
+            console.error("Fix payments error:", error);
+            toast.error(error.message || "Failed to fix milestone payments");
+        } finally {
+            setIsFixingPayments(false);
+        }
+    };
+
     const getButtonContent = () => {
         if (isSyncing) {
             return (
@@ -115,6 +163,41 @@ export function SyncBlockchainButton({
         if (syncStatus === "synced") return "default";
         return variant;
     };
+
+    if (showFixPayments) {
+        return (
+            <div className="flex gap-2">
+                <Button
+                    onClick={handleSync}
+                    disabled={isSyncing || isFixingPayments}
+                    variant={getButtonVariant()}
+                    size={size}
+                    className={`gap-2 ${className}`}
+                >
+                    {getButtonContent()}
+                </Button>
+                <Button
+                    onClick={handleFixPayments}
+                    disabled={isSyncing || isFixingPayments}
+                    variant="outline"
+                    size={size}
+                    className="gap-2"
+                >
+                    {isFixingPayments ? (
+                        <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            Fixing...
+                        </>
+                    ) : (
+                        <>
+                            <AlertTriangle className="w-4 h-4" />
+                            Fix Payments
+                        </>
+                    )}
+                </Button>
+            </div>
+        );
+    }
 
     return (
         <Button

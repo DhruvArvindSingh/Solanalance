@@ -267,6 +267,10 @@ class ApiClient {
             return this.request(`/projects/${id}`);
         },
 
+        getTransactions: async (id: string) => {
+            return this.request(`/projects/${id}/transactions`);
+        },
+
         submitMilestone: async (milestoneId: string, data: FormData) => {
             return this.request(`/projects/milestone/${milestoneId}/submit`, {
                 method: 'PUT',

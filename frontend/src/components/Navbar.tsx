@@ -34,6 +34,14 @@ export const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
+            {user && (
+              <button
+                onClick={() => navigate(userRole === "recruiter" ? "/dashboard/recruiter" : "/dashboard/freelancer")}
+                className="text-foreground/80 hover:text-foreground transition-colors font-medium"
+              >
+                Dashboard
+              </button>
+            )}
             <button
               onClick={() => navigate("/discover")}
               className="text-foreground/80 hover:text-foreground transition-colors"

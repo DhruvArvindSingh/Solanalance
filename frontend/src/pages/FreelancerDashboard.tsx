@@ -226,9 +226,10 @@ export default function FreelancerDashboard() {
                 <Card className="glass border-white/10">
                     <CardContent className="pt-6">
                         <Tabs defaultValue="applications" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2 mb-6">
+                            <TabsList className="grid w-full grid-cols-3 mb-6">
                                 <TabsTrigger value="applications">My Applications</TabsTrigger>
                                 <TabsTrigger value="projects">Active Projects</TabsTrigger>
+                                <TabsTrigger value="completed">Completed Projects</TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="applications" className="space-y-4">
@@ -305,8 +306,8 @@ export default function FreelancerDashboard() {
                                             />
                                         ))}
                                     </div>
-                                ) : projects.length > 0 ? (
-                                    projects.map((project) => (
+                                ) : projects.filter(p => p.status === "active").length > 0 ? (
+                                    projects.filter(p => p.status === "active").map((project) => (
                                         <div
                                             key={project.id}
                                             className="p-4 rounded-lg glass border border-white/10 hover:border-white/20 transition-colors cursor-pointer"
@@ -389,6 +390,78 @@ export default function FreelancerDashboard() {
                                         </p>
                                         <p className="text-sm text-muted-foreground">
                                             Apply to jobs and get selected to start working on projects
+                                        </p>
+                                    </div>
+                                )}
+                            </TabsContent>
+
+                            <TabsContent value="completed" className="space-y-4">
+                                {loading ? (
+                                    <div className="space-y-4">
+                                        {[1, 2, 3].map((i) => (
+                                            <div
+                                                key={i}
+                                                className="h-24 rounded-lg glass border border-white/10 animate-pulse"
+                                            />
+                                        ))}
+                                    </div>
+                                ) : projects.filter(p => p.status === "completed").length > 0 ? (
+                                    projects.filter(p => p.status === "completed").map((project) => (
+                                        <div
+                                            key={project.id}
+                                            className="p-4 rounded-lg glass border border-white/10 hover:border-white/20 transition-colors cursor-pointer"
+                                            onClick={() => navigate(`/projects/${project.id}`)}
+                                        >
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div className="flex-1">
+                                                    <h3 className="font-semibold text-lg mb-1">
+                                                        {project.job.title}
+                                                    </h3>
+                                                    <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-2">
+                                                        <span>Completed Project</span>
+                                                        <span>•</span>
+                                                        <span>
+                                                            Started {formatDistanceToNow(new Date(project.started_at))} ago
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Completed Progress Bar */}
+                                                    <div className="flex items-center space-x-2 mt-3">
+                                                        {[1, 2, 3].map((stage) => (
+                                                            <div
+                                                                key={stage}
+                                                                className="h-2 flex-1 rounded-full bg-gradient-solana"
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col items-end space-y-2 ml-4">
+                                                    <div className="flex items-center space-x-1 text-xl font-bold text-gradient">
+                                                        <Coins className="w-5 h-5" />
+                                                        <span>{project.job.total_payment.toFixed(2)} SOL</span>
+                                                    </div>
+
+                                                    <div className="flex items-center space-x-2">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="bg-success/10 text-success border-success/30"
+                                                        >
+                                                            <Award className="w-3 h-3 mr-1" />
+                                                            completed
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-12">
+                                        <p className="text-muted-foreground mb-4">
+                                            No completed projects yet
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Complete your active projects to see them here
                                         </p>
                                     </div>
                                 )}

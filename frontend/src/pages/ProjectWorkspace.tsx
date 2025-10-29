@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RatingModal } from "@/components/RatingModal";
 import { VerifyFundsButton } from "@/components/VerifyFundsButton";
 import { SyncBlockchainButton } from "@/components/SyncBlockchainButton";
+import { TransactionHistory } from "@/components/TransactionHistory";
 import { useMessagingStore } from "@/stores/messagingStore";
 import { useEscrowWithVerification } from "@/hooks/useEscrowWithVerification";
 import { getMilestoneStatus } from "@/lib/escrow-operations";
@@ -612,6 +613,10 @@ export default function ProjectWorkspace() {
 
     const getStageProgress = () => {
         if (!project) return 0;
+
+        // If project is completed, show 100% progress
+        if (project.status === "completed") return 100;
+
         return (project.current_stage / 3) * 100;
     };
 
@@ -623,6 +628,9 @@ export default function ProjectWorkspace() {
                 return "bg-warning/10 text-warning border-warning/30";
             case "approved":
                 return "bg-success/10 text-success border-success/30";
+            case "claimed":
+            case "completed":
+                return "bg-success/20 text-success border-success/50";
             case "revision_requested":
                 return "bg-destructive/10 text-destructive border-destructive/30";
             default:
@@ -680,11 +688,11 @@ export default function ProjectWorkspace() {
                                 Started {formatDistanceToNow(new Date(project.started_at))} ago
                             </p>
                         </div>
-                        {/* Action Buttons for Active Jobs */}
-                        {project.status === "active" && (
+                        {/* Action Buttons for Active and Completed Jobs */}
+                        {(project.status === "active" || project.status === "completed") && (
                             <div className="ml-4 flex gap-2">
-                                {/* Verify Funds Button for Freelancers */}
-                                {!isRecruiter && recruiterWallet && (
+                                {/* Verify Funds Button for Freelancers on Active Jobs */}
+                                {!isRecruiter && recruiterWallet && project.status === "active" && (
                                     <VerifyFundsButton
                                         jobId={project.job.id}
                                         jobTitle={project.job.title}
@@ -699,6 +707,7 @@ export default function ProjectWorkspace() {
                                     jobId={project.job.id}
                                     variant="outline"
                                     size="default"
+                                    showFixPayments={milestones.some(m => m.payment_amount === 0) && project.job.total_payment > 0}
                                 />
                             </div>
                         )}
@@ -717,12 +726,18 @@ export default function ProjectWorkspace() {
                                 <p className="font-mono text-sm">{project.job.id}</p>
                             </div>
                             <div>
-                                <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                                <Label className="text-sm font-medium text-muted-foreground">Project Status</Label>
                                 <Badge
                                     variant="outline"
-                                    className={project.job.status === "active" ? "bg-success/10 text-success border-success/30" : "bg-muted text-muted-foreground border-muted"}
+                                    className={
+                                        project.status === "completed"
+                                            ? "bg-success/10 text-success border-success/30"
+                                            : project.status === "active"
+                                                ? "bg-primary/10 text-primary border-primary/30"
+                                                : "bg-muted text-muted-foreground border-muted"
+                                    }
                                 >
-                                    {project.job.status}
+                                    {project.status}
                                 </Badge>
                             </div>
                             <div>
@@ -1458,6 +1473,12 @@ export default function ProjectWorkspace() {
                         )}
                     </div>
                 </div>
+
+                {/* Transaction History Section */}
+                <TransactionHistory
+                    projectId={project.id}
+                    className="mb-8"
+                />
             </div>
 
             {/* Rating Modal */}
