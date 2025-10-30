@@ -163,7 +163,7 @@ export default function CreateJob() {
                         Back
                     </Button>
                     <h1 className="text-4xl font-bold mb-2">
-                        Post a <span className="text-gradient">New Job</span>
+                        Post a <span className="text-primary">New Job</span>
                     </h1>
                     <p className="text-muted-foreground">
                         Create a milestone-based job posting to find the perfect freelancer
@@ -182,7 +182,7 @@ export default function CreateJob() {
                             >
                                 <div
                                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep > step.number
-                                        ? "bg-gradient-solana text-background"
+                                        ? "bg-primary text-background"
                                         : currentStep === step.number
                                             ? "bg-primary text-primary-foreground"
                                             : "bg-muted text-muted-foreground"
@@ -206,7 +206,7 @@ export default function CreateJob() {
                 </div>
 
                 {/* Form Steps */}
-                <Card className="glass border-white/10">
+                <Card className="bg-card border-border">
                     <CardHeader>
                         <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
                         <CardDescription>{STEPS[currentStep - 1].description}</CardDescription>
@@ -250,7 +250,7 @@ export default function CreateJob() {
                         )}
 
                         {currentStep < STEPS.length ? (
-                            <Button onClick={handleNext} className="bg-gradient-solana">
+                            <Button onClick={handleNext} className="bg-primary">
                                 Next
                                 <ArrowRight className="w-4 h-4 ml-2" />
                             </Button>
@@ -258,7 +258,7 @@ export default function CreateJob() {
                             <Button
                                 onClick={() => handleSubmit(false)}
                                 disabled={isSubmitting}
-                                className="bg-gradient-solana"
+                                className="bg-primary"
                             >
                                 {isSubmitting ? "Posting..." : "Post Job"}
                             </Button>

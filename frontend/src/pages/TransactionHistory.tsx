@@ -175,7 +175,7 @@ export default function TransactionHistory() {
                 <div className="mb-8 flex items-center justify-between">
                     <div>
                         <h1 className="text-4xl font-bold mb-2">
-                            Transaction <span className="text-gradient">History</span>
+                            Transaction <span className="text-primary">History</span>
                         </h1>
                         <p className="text-muted-foreground">
                             View all your blockchain transactions
@@ -190,16 +190,16 @@ export default function TransactionHistory() {
 
                 {/* Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardContent className="pt-6 text-center">
                             <p className="text-2xl font-bold">{transactions.length}</p>
                             <p className="text-sm text-muted-foreground">Total Transactions</p>
                         </CardContent>
                     </Card>
 
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardContent className="pt-6 text-center">
-                            <div className="flex items-center justify-center space-x-1 text-2xl font-bold text-gradient mb-1">
+                            <div className="flex items-center justify-center space-x-1 text-2xl font-bold text-primary mb-1">
                                 <Coins className="w-5 h-5" />
                                 <span>{totalVolume.toFixed(2)}</span>
                             </div>
@@ -207,7 +207,7 @@ export default function TransactionHistory() {
                         </CardContent>
                     </Card>
 
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardContent className="pt-6 text-center">
                             <p className="text-2xl font-bold text-success">
                                 {transactions.filter((t) => t.type === "payment").length}
@@ -216,7 +216,7 @@ export default function TransactionHistory() {
                         </CardContent>
                     </Card>
 
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardContent className="pt-6 text-center">
                             <p className="text-2xl font-bold text-warning">
                                 {transactions.filter((t) => t.type === "stake").length}
@@ -227,7 +227,7 @@ export default function TransactionHistory() {
                 </div>
 
                 {/* Filters */}
-                <Card className="glass border-white/10 mb-6">
+                <Card className="bg-card border-border mb-6">
                     <CardContent className="pt-6">
                         <div className="flex flex-col sm:flex-row gap-4">
                             <div className="flex-1 relative">
@@ -257,7 +257,7 @@ export default function TransactionHistory() {
                 </Card>
 
                 {/* Transactions Table */}
-                <Card className="glass border-white/10">
+                <Card className="bg-card border-border">
                     <CardHeader>
                         <CardTitle>Transactions ({filteredTransactions.length})</CardTitle>
                     </CardHeader>

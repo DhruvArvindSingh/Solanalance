@@ -153,7 +153,7 @@ export default function FreelancerDashboard() {
                 <div className="mb-8">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-4xl font-bold">
-                            Freelancer <span className="text-gradient">Dashboard</span>
+                            Freelancer <span className="text-primary">Dashboard</span>
                         </h1>
                         <RatingBadge tier={trustPoints.tier} points={trustPoints.total_points} size="lg" />
                     </div>
@@ -164,7 +164,7 @@ export default function FreelancerDashboard() {
 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader className="pb-3">
                             <CardDescription>Applications</CardDescription>
                         </CardHeader>
@@ -178,7 +178,7 @@ export default function FreelancerDashboard() {
                         </CardContent>
                     </Card>
 
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader className="pb-3">
                             <CardDescription>Active Projects</CardDescription>
                         </CardHeader>
@@ -192,7 +192,7 @@ export default function FreelancerDashboard() {
                         </CardContent>
                     </Card>
 
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader className="pb-3">
                             <CardDescription>Completed</CardDescription>
                         </CardHeader>
@@ -206,14 +206,14 @@ export default function FreelancerDashboard() {
                         </CardContent>
                     </Card>
 
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader className="pb-3">
                             <CardDescription>Total Earned</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-3xl font-bold text-gradient">{stats.totalEarned.toFixed(2)}</p>
+                                    <p className="text-3xl font-bold text-primary">{stats.totalEarned.toFixed(2)}</p>
                                     <p className="text-xs text-muted-foreground">SOL</p>
                                 </div>
                                 <Coins className="w-8 h-8 text-secondary" />
@@ -223,7 +223,7 @@ export default function FreelancerDashboard() {
                 </div>
 
                 {/* Content Tabs */}
-                <Card className="glass border-white/10">
+                <Card className="bg-card border-border">
                     <CardContent className="pt-6">
                         <Tabs defaultValue="applications" className="w-full">
                             <TabsList className="grid w-full grid-cols-3 mb-6">
@@ -238,7 +238,7 @@ export default function FreelancerDashboard() {
                                         {[1, 2, 3].map((i) => (
                                             <div
                                                 key={i}
-                                                className="h-24 rounded-lg glass border border-white/10 animate-pulse"
+                                                className="h-24 rounded-lg bg-card border border-border animate-pulse"
                                             />
                                         ))}
                                     </div>
@@ -246,7 +246,7 @@ export default function FreelancerDashboard() {
                                     applications.map((application) => (
                                         <div
                                             key={application.id}
-                                            className="p-4 rounded-lg glass border border-white/10 hover:border-white/20 transition-colors cursor-pointer"
+                                            className="p-4 rounded-lg bg-card border border-border hover:border-border transition-colors cursor-pointer"
                                             onClick={() => navigate(`/jobs/${application.job_id}`)}
                                         >
                                             <div className="flex items-start justify-between mb-2">
@@ -266,7 +266,7 @@ export default function FreelancerDashboard() {
 
                                                 <div className="flex items-center space-x-4">
                                                     <div className="text-right mr-4">
-                                                        <div className="flex items-center space-x-1 text-xl font-bold text-gradient">
+                                                        <div className="flex items-center space-x-1 text-xl font-bold text-primary">
                                                             <Coins className="w-5 h-5" />
                                                             <span>{application.job.total_payment.toFixed(2)} SOL</span>
                                                         </div>
@@ -288,7 +288,7 @@ export default function FreelancerDashboard() {
                                         </p>
                                         <Button
                                             onClick={() => navigate("/#jobs")}
-                                            className="bg-gradient-solana"
+                                            className="bg-primary"
                                         >
                                             Browse Jobs
                                         </Button>
@@ -302,7 +302,7 @@ export default function FreelancerDashboard() {
                                         {[1, 2, 3].map((i) => (
                                             <div
                                                 key={i}
-                                                className="h-24 rounded-lg glass border border-white/10 animate-pulse"
+                                                className="h-24 rounded-lg bg-card border border-border animate-pulse"
                                             />
                                         ))}
                                     </div>
@@ -310,7 +310,7 @@ export default function FreelancerDashboard() {
                                     projects.filter(p => p.status === "active").map((project) => (
                                         <div
                                             key={project.id}
-                                            className="p-4 rounded-lg glass border border-white/10 hover:border-white/20 transition-colors cursor-pointer"
+                                            className="p-4 rounded-lg bg-card border border-border hover:border-border transition-colors cursor-pointer"
                                             onClick={() => navigate(`/projects/${project.id}`)}
                                         >
                                             <div className="flex items-start justify-between mb-2">
@@ -332,7 +332,7 @@ export default function FreelancerDashboard() {
                                                             <div
                                                                 key={stage}
                                                                 className={`h-2 flex-1 rounded-full ${stage <= project.current_stage
-                                                                    ? "bg-gradient-solana"
+                                                                    ? "bg-primary"
                                                                     : "bg-muted"
                                                                     }`}
                                                             />
@@ -341,7 +341,7 @@ export default function FreelancerDashboard() {
                                                 </div>
 
                                                 <div className="flex flex-col items-end space-y-2 ml-4">
-                                                    <div className="flex items-center space-x-1 text-xl font-bold text-gradient">
+                                                    <div className="flex items-center space-x-1 text-xl font-bold text-primary">
                                                         <Coins className="w-5 h-5" />
                                                         <span>{project.job.total_payment.toFixed(2)} SOL</span>
                                                     </div>
@@ -401,7 +401,7 @@ export default function FreelancerDashboard() {
                                         {[1, 2, 3].map((i) => (
                                             <div
                                                 key={i}
-                                                className="h-24 rounded-lg glass border border-white/10 animate-pulse"
+                                                className="h-24 rounded-lg bg-card border border-border animate-pulse"
                                             />
                                         ))}
                                     </div>
@@ -409,7 +409,7 @@ export default function FreelancerDashboard() {
                                     projects.filter(p => p.status === "completed").map((project) => (
                                         <div
                                             key={project.id}
-                                            className="p-4 rounded-lg glass border border-white/10 hover:border-white/20 transition-colors cursor-pointer"
+                                            className="p-4 rounded-lg bg-card border border-border hover:border-border transition-colors cursor-pointer"
                                             onClick={() => navigate(`/projects/${project.id}`)}
                                         >
                                             <div className="flex items-start justify-between mb-2">
@@ -430,14 +430,14 @@ export default function FreelancerDashboard() {
                                                         {[1, 2, 3].map((stage) => (
                                                             <div
                                                                 key={stage}
-                                                                className="h-2 flex-1 rounded-full bg-gradient-solana"
+                                                                className="h-2 flex-1 rounded-full bg-primary"
                                                             />
                                                         ))}
                                                     </div>
                                                 </div>
 
                                                 <div className="flex flex-col items-end space-y-2 ml-4">
-                                                    <div className="flex items-center space-x-1 text-xl font-bold text-gradient">
+                                                    <div className="flex items-center space-x-1 text-xl font-bold text-primary">
                                                         <Coins className="w-5 h-5" />
                                                         <span>{project.job.total_payment.toFixed(2)} SOL</span>
                                                     </div>

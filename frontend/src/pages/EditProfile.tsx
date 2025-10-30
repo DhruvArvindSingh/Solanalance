@@ -231,20 +231,20 @@ export default function EditProfile() {
                 </Button>
 
                 <h1 className="text-4xl font-bold mb-8">
-                    Edit <span className="text-gradient">Profile</span>
+                    Edit <span className="text-primary">Profile</span>
                 </h1>
 
                 <form onSubmit={handleSave} className="space-y-6">
                     {/* Avatar */}
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader>
                             <CardTitle>Profile Picture</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex items-center space-x-6">
-                                <Avatar className="w-24 h-24 border-4 border-white/10">
+                                <Avatar className="w-24 h-24 border-4 border-border">
                                     <AvatarImage src={previewUrl || avatarUrl || undefined} />
-                                    <AvatarFallback className="bg-gradient-solana text-background text-3xl font-bold">
+                                    <AvatarFallback className="bg-primary text-background text-3xl font-bold">
                                         {(fullName.charAt(0) || "?").toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
@@ -269,7 +269,7 @@ export default function EditProfile() {
                                                         size="sm"
                                                         onClick={handleUploadProfilePicture}
                                                         disabled={uploadingProfilePic}
-                                                        className="bg-gradient-solana"
+                                                        className="bg-primary"
                                                     >
                                                         {uploadingProfilePic ? (
                                                             <>
@@ -308,7 +308,7 @@ export default function EditProfile() {
                     </Card>
 
                     {/* Basic Information */}
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader>
                             <CardTitle>Basic Information</CardTitle>
                         </CardHeader>
@@ -375,7 +375,7 @@ export default function EditProfile() {
                     </Card>
 
                     {/* Wallet Address */}
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Wallet className="w-5 h-5" />
@@ -392,7 +392,7 @@ export default function EditProfile() {
                                         type="button"
                                         size="sm"
                                         onClick={() => setVisible(true)}
-                                        className="bg-gradient-solana"
+                                        className="bg-primary"
                                     >
                                         <Wallet className="w-4 h-4 mr-2" />
                                         Connect Wallet
@@ -434,7 +434,7 @@ export default function EditProfile() {
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => setVisible(true)}
-                                                className="bg-gradient-solana text-white hover:bg-gradient-solana/90"
+                                                className="bg-primary text-white hover:bg-primary/90"
                                             >
                                                 <Wallet className="w-4 h-4 mr-2" />
                                                 Select Wallet
@@ -447,7 +447,7 @@ export default function EditProfile() {
                     </Card>
 
                     {/* Skills */}
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader>
                             <CardTitle>Skills (Min: 3, Max: 15)</CardTitle>
                         </CardHeader>
@@ -504,7 +504,7 @@ export default function EditProfile() {
                     </Card>
 
                     {/* Social Media Links */}
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <LinkIcon className="w-5 h-5" />
@@ -647,7 +647,7 @@ export default function EditProfile() {
                         <Button
                             type="submit"
                             disabled={saving || !fullName.trim() || skills.length < 3}
-                            className="bg-gradient-solana"
+                            className="bg-primary"
                         >
                             {saving ? (
                                 "Saving..."

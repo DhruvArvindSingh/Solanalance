@@ -12,7 +12,7 @@ const Discover = () => {
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center fade-in">
                         <h1 className="text-5xl font-bold mb-4">
-                            Discover <span className="text-gradient">Opportunities</span>
+                            Discover <span className="text-primary">Opportunities</span>
                         </h1>
                         <p className="text-muted-foreground text-xl max-w-2xl mx-auto">
                             Find the perfect project and start earning in SOL. Browse through thousands of opportunities from top companies worldwide.

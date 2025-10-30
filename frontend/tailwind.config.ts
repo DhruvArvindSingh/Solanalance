@@ -62,11 +62,6 @@ export default {
           iron: "hsl(var(--tier-iron))",
         },
       },
-      backgroundImage: {
-        'gradient-solana': 'var(--gradient-solana)',
-        'gradient-hero': 'var(--gradient-hero)',
-        'gradient-card': 'var(--gradient-card)',
-      },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },

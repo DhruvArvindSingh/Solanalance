@@ -3,7 +3,7 @@ import { Shield, Zap, TrendingUp, Lock, Coins, Users } from "lucide-react";
 const features = [
   {
     icon: Shield,
-    title: "20% Stake Protection",
+    title: "100% Stake Protection",
     description: "Recruiters stake funds upfront, ensuring payment security for freelancers on every project.",
   },
   {
@@ -40,7 +40,7 @@ export const Features = () => {
         {/* Header */}
         <div className="max-w-3xl mx-auto text-center mb-16 fade-in">
           <h2 className="text-4xl font-bold mb-4">
-            Why Choose <span className="text-gradient">SolanaLance</span>
+            Why Choose <span className="text-primary">SolanaLance</span>
           </h2>
           <p className="text-muted-foreground text-lg">
             Experience the future of freelancing with blockchain-powered security and transparency
@@ -48,18 +48,19 @@ export const Features = () => {
         </div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 fade-in">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 fade-in">
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
               <div
                 key={index}
-                className="group p-6 rounded-2xl glass border border-white/10 hover:border-primary/30 transition-all duration-300 hover-lift"
+                className="group relative p-6 rounded-lg bg-card border border-border hover:border-primary/40 transition-all duration-200 hover-lift"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-solana flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Icon className="w-6 h-6 text-background" />
+                <div className="absolute top-0 left-0 w-1 h-full bg-primary/0 group-hover:bg-primary/100 transition-all duration-200 rounded-l-lg"></div>
+                <div className="w-12 h-12 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
+                  <Icon className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2 group-hover:text-gradient transition-colors">
+                <h3 className="text-xl font-semibold mb-2">
                   {feature.title}
                 </h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">

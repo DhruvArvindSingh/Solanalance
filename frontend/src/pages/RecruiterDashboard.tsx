@@ -124,7 +124,7 @@ export default function RecruiterDashboard() {
                 <div className="mb-8 flex items-center justify-between">
                     <div>
                         <h1 className="text-4xl font-bold mb-2">
-                            Recruiter <span className="text-gradient">Dashboard</span>
+                            Recruiter <span className="text-primary">Dashboard</span>
                         </h1>
                         <p className="text-muted-foreground">
                             Manage your job postings and track applications
@@ -133,7 +133,7 @@ export default function RecruiterDashboard() {
 
                     <Button
                         onClick={() => navigate("/jobs/create")}
-                        className="bg-gradient-solana"
+                        className="bg-primary"
                         size="lg"
                     >
                         <Plus className="w-5 h-5 mr-2" />
@@ -143,7 +143,7 @@ export default function RecruiterDashboard() {
 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader className="pb-3">
                             <CardDescription>Total Jobs</CardDescription>
                         </CardHeader>
@@ -157,7 +157,7 @@ export default function RecruiterDashboard() {
                         </CardContent>
                     </Card>
 
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader className="pb-3">
                             <CardDescription>Open Jobs</CardDescription>
                         </CardHeader>
@@ -171,7 +171,7 @@ export default function RecruiterDashboard() {
                         </CardContent>
                     </Card>
 
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader className="pb-3">
                             <CardDescription>In Progress</CardDescription>
                         </CardHeader>
@@ -185,14 +185,14 @@ export default function RecruiterDashboard() {
                         </CardContent>
                     </Card>
 
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardHeader className="pb-3">
                             <CardDescription>Total Spent</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-3xl font-bold text-gradient">{stats.totalSpent.toFixed(2)}</p>
+                                    <p className="text-3xl font-bold text-primary">{stats.totalSpent.toFixed(2)}</p>
                                     <p className="text-xs text-muted-foreground">SOL</p>
                                 </div>
                                 <Coins className="w-8 h-8 text-secondary" />
@@ -202,7 +202,7 @@ export default function RecruiterDashboard() {
                 </div>
 
                 {/* Jobs Tabs */}
-                <Card className="glass border-white/10">
+                <Card className="bg-card border-border">
                     <CardContent className="pt-6">
                         <Tabs defaultValue="all" className="w-full">
                             <TabsList className="grid w-full grid-cols-5 mb-6">
@@ -224,7 +224,7 @@ export default function RecruiterDashboard() {
                                                 {[1, 2, 3].map((i) => (
                                                     <div
                                                         key={i}
-                                                        className="h-24 rounded-lg glass border border-white/10 animate-pulse"
+                                                        className="h-24 rounded-lg bg-card border border-border animate-pulse"
                                                     />
                                                 ))}
                                             </div>
@@ -232,7 +232,7 @@ export default function RecruiterDashboard() {
                                             filteredJobs.map((job) => (
                                                 <div
                                                     key={job.id}
-                                                    className="p-4 rounded-lg glass border border-white/10 hover:border-white/20 transition-colors cursor-pointer"
+                                                    className="p-4 rounded-lg bg-card border border-border hover:border-border transition-colors cursor-pointer"
                                                     onClick={() => {
                                                         // For active jobs, navigate to project workspace
                                                         if (job.status === "active" && jobProjectMap[job.id]) {
@@ -258,7 +258,7 @@ export default function RecruiterDashboard() {
 
                                                         <div className="flex items-center space-x-4">
                                                             <div className="text-right mr-4">
-                                                                <div className="flex items-center space-x-1 text-xl font-bold text-gradient">
+                                                                <div className="flex items-center space-x-1 text-xl font-bold text-primary">
                                                                     <Coins className="w-5 h-5" />
                                                                     <span>{job.total_payment.toFixed(2)} SOL</span>
                                                                 </div>
@@ -304,7 +304,7 @@ export default function RecruiterDashboard() {
                                                 {tab === "all" && (
                                                     <Button
                                                         onClick={() => navigate("/jobs/create")}
-                                                        className="bg-gradient-solana"
+                                                        className="bg-primary"
                                                     >
                                                         <Plus className="w-4 h-4 mr-2" />
                                                         Post Your First Job

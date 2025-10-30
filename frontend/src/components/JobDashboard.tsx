@@ -219,7 +219,7 @@ export const JobDashboard = ({ showHeader = true }: JobDashboardProps) => {
         {showHeader && (
           <div className="mb-12 fade-in">
             <h2 className="text-4xl font-bold mb-4">
-              Discover <span className="text-gradient">Opportunities</span>
+              Discover <span className="text-primary">Opportunities</span>
             </h2>
             <p className="text-muted-foreground text-lg">
               Find the perfect project and start earning in SOL
@@ -234,7 +234,7 @@ export const JobDashboard = ({ showHeader = true }: JobDashboardProps) => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
                 placeholder="Search jobs, skills, or companies..."
-                className="pl-12 h-12 glass border-white/10 focus:border-primary/50"
+                className="pl-12 h-12 bg-card border-border focus:border-primary"
                 value={filters.searchQuery}
                 onChange={(e) => updateFilter("searchQuery", e.target.value)}
               />
@@ -242,7 +242,7 @@ export const JobDashboard = ({ showHeader = true }: JobDashboardProps) => {
 
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="outline" className="glass border-white/10 h-12 px-6">
+                <Button variant="outline" className="border-border h-12 px-6">
                   <SlidersHorizontal className="w-5 h-5 mr-2" />
                   Filters
                   {hasActiveFilters && (
@@ -365,7 +365,7 @@ export const JobDashboard = ({ showHeader = true }: JobDashboardProps) => {
               value={filters.sortBy}
               onValueChange={(value) => updateFilter("sortBy", value)}
             >
-              <SelectTrigger className="w-[180px] glass border-white/10 h-12">
+              <SelectTrigger className="w-[180px] border-border h-12">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -424,7 +424,7 @@ export const JobDashboard = ({ showHeader = true }: JobDashboardProps) => {
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="h-[400px] rounded-2xl glass border border-white/10 animate-pulse"
+                className="h-[400px] rounded-lg skeleton border border-border"
               />
             ))}
           </div>

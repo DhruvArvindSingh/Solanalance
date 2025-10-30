@@ -192,12 +192,12 @@ export default function JobApplicants() {
     };
 
     const ApplicationCard = ({ application }: { application: Application }) => (
-        <Card className="glass border-white/10 hover:border-white/20 transition-colors">
+        <Card className="bg-card border-border hover:border-border transition-colors">
             <CardContent className="pt-6">
                 <div className="flex items-start space-x-4 mb-4">
-                    <Avatar className="w-16 h-16 border-2 border-white/10">
+                    <Avatar className="w-16 h-16 border-2 border-border">
                         <AvatarImage src={application.freelancer.avatar_url || undefined} />
-                        <AvatarFallback className="bg-gradient-solana text-background text-xl font-semibold">
+                        <AvatarFallback className="bg-primary text-background text-xl font-semibold">
                             {application.freelancer.full_name.charAt(0)}
                         </AvatarFallback>
                     </Avatar>
@@ -348,7 +348,7 @@ export default function JobApplicants() {
                                 <div className="flex space-x-2">
                                     <Button
                                         onClick={() => handleSelectFreelancer(application)}
-                                        className="flex-1 bg-gradient-solana"
+                                        className="flex-1 bg-primary"
                                     >
                                         <CheckCircle className="w-4 h-4 mr-2" />
                                         Select & Stake
@@ -381,7 +381,7 @@ export default function JobApplicants() {
                                 <div className="flex space-x-2">
                                     <Button
                                         onClick={() => handleSelectFreelancer(application)}
-                                        className="flex-1 bg-gradient-solana"
+                                        className="flex-1 bg-primary"
                                     >
                                         <CheckCircle className="w-4 h-4 mr-2" />
                                         Select & Stake
@@ -462,7 +462,7 @@ export default function JobApplicants() {
 
                 {/* Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardContent className="pt-6">
                             <div className="text-center">
                                 <p className="text-3xl font-bold">{applications.length}</p>
@@ -470,7 +470,7 @@ export default function JobApplicants() {
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardContent className="pt-6">
                             <div className="text-center">
                                 <p className="text-3xl font-bold text-warning">{pendingApplications.length}</p>
@@ -478,7 +478,7 @@ export default function JobApplicants() {
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardContent className="pt-6">
                             <div className="text-center">
                                 <p className="text-3xl font-bold text-primary">{shortlistedApplications.length}</p>
@@ -486,10 +486,10 @@ export default function JobApplicants() {
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="glass border-white/10">
+                    <Card className="bg-card border-border">
                         <CardContent className="pt-6">
                             <div className="text-center">
-                                <p className="text-3xl font-bold text-gradient">{job.total_payment.toFixed(2)} SOL</p>
+                                <p className="text-3xl font-bold text-primary">{job.total_payment.toFixed(2)} SOL</p>
                                 <p className="text-sm text-muted-foreground">Total Payment</p>
                             </div>
                         </CardContent>
@@ -509,7 +509,7 @@ export default function JobApplicants() {
                         {applications.length > 0 ? (
                             applications.map((app) => <ApplicationCard key={app.id} application={app} />)
                         ) : (
-                            <Card className="glass border-white/10">
+                            <Card className="bg-card border-border">
                                 <CardContent className="py-16 text-center">
                                     <p className="text-muted-foreground">No applications yet</p>
                                 </CardContent>
@@ -521,7 +521,7 @@ export default function JobApplicants() {
                         {pendingApplications.length > 0 ? (
                             pendingApplications.map((app) => <ApplicationCard key={app.id} application={app} />)
                         ) : (
-                            <Card className="glass border-white/10">
+                            <Card className="bg-card border-border">
                                 <CardContent className="py-16 text-center">
                                     <p className="text-muted-foreground">No pending applications</p>
                                 </CardContent>
@@ -533,7 +533,7 @@ export default function JobApplicants() {
                         {shortlistedApplications.length > 0 ? (
                             shortlistedApplications.map((app) => <ApplicationCard key={app.id} application={app} />)
                         ) : (
-                            <Card className="glass border-white/10">
+                            <Card className="bg-card border-border">
                                 <CardContent className="py-16 text-center">
                                     <p className="text-muted-foreground">No shortlisted applications</p>
                                 </CardContent>
@@ -545,7 +545,7 @@ export default function JobApplicants() {
                         {rejectedApplications.length > 0 ? (
                             rejectedApplications.map((app) => <ApplicationCard key={app.id} application={app} />)
                         ) : (
-                            <Card className="glass border-white/10">
+                            <Card className="bg-card border-border">
                                 <CardContent className="py-16 text-center">
                                     <p className="text-muted-foreground">No rejected applications</p>
                                 </CardContent>
@@ -575,7 +575,7 @@ export default function JobApplicants() {
 
             {/* Reject Confirmation Dialog */}
             <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-                <AlertDialogContent className="glass border-white/10">
+                <AlertDialogContent className="bg-card border-border">
                     <AlertDialogHeader>
                         <AlertDialogTitle>Reject Application?</AlertDialogTitle>
                         <AlertDialogDescription>

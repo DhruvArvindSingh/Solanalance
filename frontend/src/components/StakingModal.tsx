@@ -170,7 +170,7 @@ export const StakingModal = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px] glass border-white/10">
+            <DialogContent className="sm:max-w-[500px] bg-card border-border">
                 <DialogHeader>
                     <DialogTitle className="text-2xl flex items-center space-x-2">
                         <Coins className="w-6 h-6 text-secondary" />
@@ -255,7 +255,7 @@ export const StakingModal = ({
                         <Button
                             onClick={handleStake}
                             disabled={!connected || isStaking || insufficientBalance}
-                            className="flex-1 bg-gradient-solana"
+                            className="flex-1 bg-primary"
                         >
                             {isStaking ? (
                                 <>

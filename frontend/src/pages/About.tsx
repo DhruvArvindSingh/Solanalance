@@ -119,7 +119,7 @@ const About = () => {
 
                     <div className="text-center mb-16">
                         <h1 className="text-5xl font-bold mb-6">
-                            About <span className="text-gradient">SolanaLance</span>
+                            About <span className="text-primary">SolanaLance</span>
                         </h1>
                         <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
                             We're revolutionizing freelancing by combining the power of blockchain technology
@@ -133,9 +133,9 @@ const About = () => {
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8 mb-20">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                         {stats.map((stat, index) => (
-                            <Card key={index} className="glass border-white/10 text-center">
+                            <Card key={index} className="bg-card border-border text-center">
                                 <CardContent className="pt-8">
-                                    <div className="text-3xl font-bold text-gradient mb-2">{stat.number}</div>
+                                    <div className="text-3xl font-bold text-primary mb-2">{stat.number}</div>
                                     <div className="text-muted-foreground">{stat.label}</div>
                                 </CardContent>
                             </Card>
@@ -169,7 +169,7 @@ const About = () => {
                             </div>
                         </div>
                         <div>
-                            <Card className="glass border-white/10">
+                            <Card className="bg-card border-border">
                                 <CardContent className="p-8">
                                     <div className="text-center">
                                         <Target className="w-16 h-16 text-primary mx-auto mb-4" />
@@ -197,7 +197,7 @@ const About = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {values.map((value, index) => (
-                            <Card key={index} className="glass border-white/10">
+                            <Card key={index} className="bg-card border-border">
                                 <CardContent className="p-6">
                                     <div className="flex items-start space-x-4">
                                         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -227,7 +227,7 @@ const About = () => {
                         {milestones.map((milestone, index) => (
                             <div key={index} className="flex items-start space-x-6 mb-8">
                                 <div className="flex flex-col items-center">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-solana flex items-center justify-center text-white font-bold">
+                                    <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-bold">
                                         {milestone.year.slice(-2)}
                                     </div>
                                     {index < milestones.length - 1 && (
@@ -255,10 +255,10 @@ const About = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                         {team.map((member, index) => (
-                            <Card key={index} className="glass border-white/10 text-center">
+                            <Card key={index} className="bg-card border-border text-center">
                                 <CardContent className="pt-8">
                                     <Avatar className="w-20 h-20 mx-auto mb-4 border-4 border-primary/20">
-                                        <AvatarFallback className="bg-gradient-solana text-white text-xl font-bold">
+                                        <AvatarFallback className="bg-primary text-white text-xl font-bold">
                                             {member.avatar}
                                         </AvatarFallback>
                                     </Avatar>
@@ -273,7 +273,7 @@ const About = () => {
 
                 {/* CTA */}
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                    <Card className="glass border-white/10 bg-gradient-to-r from-primary/5 to-secondary/5">
+                    <Card className="bg-card border-border bg-gradient-to-r from-primary/5 to-secondary/5">
                         <CardContent className="text-center py-12">
                             <Heart className="w-16 h-16 text-primary mx-auto mb-4" />
                             <h3 className="text-2xl font-bold mb-4">Join Our Community</h3>
@@ -284,7 +284,7 @@ const About = () => {
                             <div className="flex flex-col sm:flex-row gap-4 justify-center">
                                 <Button
                                     size="lg"
-                                    className="bg-gradient-solana"
+                                    className="bg-primary"
                                     onClick={() => navigate("/auth")}
                                 >
                                     Get Started Today

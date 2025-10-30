@@ -40,9 +40,8 @@ export const JobCard = ({
   return (
     <div
       className={cn(
-        "group relative p-6 rounded-2xl glass border border-white/10",
-        "hover-lift cursor-pointer transition-all duration-300",
-        "bg-gradient-card hover:border-white/20",
+        "group relative p-6 rounded-lg modern-card",
+        "hover-lift cursor-pointer",
         className
       )}
       onClick={() => id && navigate(`/jobs/${id}`)}
@@ -50,9 +49,9 @@ export const JobCard = ({
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <Avatar className="w-12 h-12 border-2 border-white/10">
+          <Avatar className="w-12 h-12 border-2 border-border">
             <AvatarImage src={recruiterAvatar} />
-            <AvatarFallback className="bg-gradient-solana text-background font-semibold">
+            <AvatarFallback className="bg-primary/10 border border-primary/20 text-primary font-semibold">
               {recruiterName.charAt(0)}
             </AvatarFallback>
           </Avatar>
@@ -65,7 +64,7 @@ export const JobCard = ({
       </div>
 
       {/* Job Title */}
-      <h2 className="text-xl font-bold text-foreground mb-2 group-hover:text-gradient transition-colors">
+      <h2 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors">
         {title}
       </h2>
 
@@ -90,12 +89,12 @@ export const JobCard = ({
       </div>
 
       {/* Payment Info */}
-      <div className="mb-4 p-4 rounded-xl bg-background/50 border border-white/5">
+      <div className="mb-4 p-4 rounded-lg bg-muted/30 border border-border">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-muted-foreground">Total Payment</span>
+          <span className="text-sm text-muted-foreground font-medium">Total Payment</span>
           <div className="flex items-center space-x-2">
-            <Coins className="w-5 h-5 text-secondary" />
-            <span className="text-2xl font-bold text-gradient">{totalPayment} SOL</span>
+            <Coins className="w-5 h-5 text-primary" />
+            <span className="text-2xl font-bold text-primary">{totalPayment} SOL</span>
           </div>
         </div>
         <div className="space-y-1">
@@ -109,7 +108,7 @@ export const JobCard = ({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-4 border-t border-white/5">
+      <div className="flex items-center justify-between pt-4 border-t border-border">
         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
           <div className="flex items-center space-x-1">
             <Calendar className="w-4 h-4" />

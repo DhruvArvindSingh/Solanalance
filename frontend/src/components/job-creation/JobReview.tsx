@@ -28,7 +28,7 @@ export const JobReview = ({ formData }: JobReviewProps) => {
     return (
         <div className="space-y-6">
             {/* Preview Card */}
-            <div className="p-6 bg-gradient-card rounded-xl border border-white/10">
+            <div className="p-6 bg-gradient-card rounded-xl border border-border">
                 <div className="flex items-start justify-between mb-4">
                     <div>
                         <h2 className="text-2xl font-bold mb-2">{formData.title || "Untitled Job"}</h2>
@@ -40,7 +40,7 @@ export const JobReview = ({ formData }: JobReviewProps) => {
                         )}
                     </div>
                     <div className="text-right">
-                        <div className="flex items-center space-x-2 text-2xl font-bold text-gradient">
+                        <div className="flex items-center space-x-2 text-2xl font-bold text-primary">
                             <Coins className="w-6 h-6" />
                             <span>{formData.totalPayment.toFixed(2)} SOL</span>
                         </div>
@@ -102,15 +102,15 @@ export const JobReview = ({ formData }: JobReviewProps) => {
                 <h3 className="text-lg font-semibold mb-4">Payment Structure</h3>
                 <div className="space-y-4">
                     {/* Stage 1 */}
-                    <div className="p-4 bg-muted/50 rounded-lg border border-white/5">
+                    <div className="p-4 bg-muted/50 rounded-lg border border-border">
                         <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center space-x-2">
-                                <div className="w-6 h-6 rounded-full bg-gradient-solana flex items-center justify-center text-xs font-bold">
+                                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold">
                                     1
                                 </div>
                                 <h4 className="font-medium">{formData.stage1Name}</h4>
                             </div>
-                            <div className="flex items-center space-x-1 text-lg font-bold text-gradient">
+                            <div className="flex items-center space-x-1 text-lg font-bold text-primary">
                                 <Coins className="w-4 h-4" />
                                 <span>{formData.stage1Payment.toFixed(2)} SOL</span>
                             </div>
@@ -123,15 +123,15 @@ export const JobReview = ({ formData }: JobReviewProps) => {
                     </div>
 
                     {/* Stage 2 */}
-                    <div className="p-4 bg-muted/50 rounded-lg border border-white/5">
+                    <div className="p-4 bg-muted/50 rounded-lg border border-border">
                         <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center space-x-2">
-                                <div className="w-6 h-6 rounded-full bg-gradient-solana flex items-center justify-center text-xs font-bold">
+                                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold">
                                     2
                                 </div>
                                 <h4 className="font-medium">{formData.stage2Name}</h4>
                             </div>
-                            <div className="flex items-center space-x-1 text-lg font-bold text-gradient">
+                            <div className="flex items-center space-x-1 text-lg font-bold text-primary">
                                 <Coins className="w-4 h-4" />
                                 <span>{formData.stage2Payment.toFixed(2)} SOL</span>
                             </div>
@@ -144,15 +144,15 @@ export const JobReview = ({ formData }: JobReviewProps) => {
                     </div>
 
                     {/* Stage 3 */}
-                    <div className="p-4 bg-muted/50 rounded-lg border border-white/5">
+                    <div className="p-4 bg-muted/50 rounded-lg border border-border">
                         <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center space-x-2">
-                                <div className="w-6 h-6 rounded-full bg-gradient-solana flex items-center justify-center text-xs font-bold">
+                                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold">
                                     3
                                 </div>
                                 <h4 className="font-medium">{formData.stage3Name}</h4>
                             </div>
-                            <div className="flex items-center space-x-1 text-lg font-bold text-gradient">
+                            <div className="flex items-center space-x-1 text-lg font-bold text-primary">
                                 <Coins className="w-4 h-4" />
                                 <span>{formData.stage3Payment.toFixed(2)} SOL</span>
                             </div>

@@ -553,7 +553,7 @@ export default function JobDetail() {
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Job Header */}
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardHeader>
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex-1">
@@ -575,7 +575,7 @@ export default function JobDetail() {
                                     </div>
 
                                     <div className="text-right">
-                                        <div className="flex items-center space-x-2 text-3xl font-bold text-gradient mb-1">
+                                        <div className="flex items-center space-x-2 text-3xl font-bold text-primary mb-1">
                                             <Coins className="w-8 h-8" />
                                             <span>{job.total_payment.toFixed(2)} SOL</span>
                                         </div>
@@ -603,7 +603,7 @@ export default function JobDetail() {
                         </Card>
 
                         {/* Description */}
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardHeader>
                                 <CardTitle>Job Description</CardTitle>
                             </CardHeader>
@@ -615,7 +615,7 @@ export default function JobDetail() {
                         </Card>
 
                         {/* Skills */}
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardHeader>
                                 <CardTitle>Required Skills</CardTitle>
                             </CardHeader>
@@ -632,7 +632,7 @@ export default function JobDetail() {
 
                         {/* Selected Freelancer (for active jobs) */}
                         {job.status === 'active' && selectedFreelancer && (
-                            <Card className="glass border-white/10 border-success/30">
+                            <Card className="bg-card border-border border-success/30">
                                 <CardHeader>
                                     <CardTitle className="flex items-center space-x-2">
                                         <User className="w-5 h-5" />
@@ -643,7 +643,7 @@ export default function JobDetail() {
                                     <div className="flex items-start space-x-4">
                                         <Avatar className="w-16 h-16 border-2 border-success/30">
                                             <AvatarImage src={selectedFreelancer.avatar_url || undefined} />
-                                            <AvatarFallback className="bg-gradient-solana text-background text-xl font-semibold">
+                                            <AvatarFallback className="bg-primary text-background text-xl font-semibold">
                                                 {selectedFreelancer.full_name.charAt(0)}
                                             </AvatarFallback>
                                         </Avatar>
@@ -678,7 +678,7 @@ export default function JobDetail() {
 
                         {/* Escrow Information (for active jobs) */}
                         {job.status === 'active' && (job.recruiter_wallet || job.escrow) && (
-                            <Card className="glass border-white/10 border-primary/30">
+                            <Card className="bg-card border-border border-primary/30">
                                 <CardHeader>
                                     <CardTitle className="flex items-center space-x-2">
                                         <Shield className="w-5 h-5" />
@@ -722,7 +722,7 @@ export default function JobDetail() {
                                                     <p className="text-xs text-muted-foreground">Current Funds</p>
                                                     <div className="flex items-center space-x-2">
                                                         <Coins className="w-4 h-4 text-primary" />
-                                                        <span className="text-lg font-bold text-gradient">
+                                                        <span className="text-lg font-bold text-primary">
                                                             {job.escrow?.current_funds?.toFixed(4) || '0.0000'} SOL
                                                         </span>
                                                     </div>
@@ -767,7 +767,7 @@ export default function JobDetail() {
 
                         {/* Milestone Submissions (for active jobs) */}
                         {job.status === 'active' && milestones.length > 0 && (
-                            <Card className="glass border-white/10">
+                            <Card className="bg-card border-border">
                                 <CardHeader>
                                     <CardTitle>Milestone Submissions</CardTitle>
                                 </CardHeader>
@@ -775,11 +775,11 @@ export default function JobDetail() {
                                     {milestones.map((milestone) => (
                                         <div
                                             key={milestone.id}
-                                            className="p-4 bg-gradient-card rounded-lg border border-white/5"
+                                            className="p-4 bg-gradient-card rounded-lg border border-border"
                                         >
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex items-center space-x-3">
-                                                    <div className="w-8 h-8 rounded-full bg-gradient-solana flex items-center justify-center text-sm font-bold">
+                                                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-sm font-bold">
                                                         {milestone.stage_number}
                                                     </div>
                                                     <div>
@@ -793,7 +793,7 @@ export default function JobDetail() {
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <div className="flex items-center space-x-1 text-lg font-bold text-gradient">
+                                                    <div className="flex items-center space-x-1 text-lg font-bold text-primary">
                                                         <Coins className="w-5 h-5" />
                                                         <span>{milestone.payment_amount.toFixed(2)} SOL</span>
                                                     </div>
@@ -807,7 +807,7 @@ export default function JobDetail() {
                                             </div>
 
                                             {milestone.submission_description && (
-                                                <div className="mt-3 p-3 bg-background/50 rounded border border-white/5">
+                                                <div className="mt-3 p-3 bg-background/50 rounded border border-border">
                                                     <p className="text-sm font-medium mb-1 flex items-center space-x-2">
                                                         <FileText className="w-4 h-4" />
                                                         <span>Submission</span>
@@ -920,7 +920,7 @@ export default function JobDetail() {
                                                                 <Button
                                                                     onClick={() => handleApproveMilestone(milestone)}
                                                                     disabled={isApproving || isRequestingChanges}
-                                                                    className="flex-1 bg-gradient-solana"
+                                                                    className="flex-1 bg-primary"
                                                                 >
                                                                     {isApproving ? (
                                                                         <>
@@ -942,7 +942,7 @@ export default function JobDetail() {
                                                             <Button
                                                                 onClick={() => setReviewingMilestoneId(milestone.id)}
                                                                 size="sm"
-                                                                className="bg-gradient-solana"
+                                                                className="bg-primary"
                                                             >
                                                                 Review Submission
                                                             </Button>
@@ -970,7 +970,7 @@ export default function JobDetail() {
                                                             <Button
                                                                 onClick={() => handleClaimMilestone(milestone)}
                                                                 disabled={claimingMilestoneId === milestone.id || claimingMilestoneId !== null}
-                                                                className="bg-gradient-solana hover:opacity-90"
+                                                                className="bg-primary hover:opacity-90"
                                                             >
                                                                 {claimingMilestoneId === milestone.id ? (
                                                                     <>
@@ -1017,7 +1017,7 @@ export default function JobDetail() {
                                                         </div>
                                                         <Button
                                                             onClick={() => navigate(`/freelancer-dashboard`)}
-                                                            className="bg-gradient-solana hover:opacity-90"
+                                                            className="bg-primary hover:opacity-90"
                                                         >
                                                             <Edit className="w-4 h-4 mr-2" />
                                                             Go to Project Workspace
@@ -1032,7 +1032,7 @@ export default function JobDetail() {
                         )}
 
                         {/* Payment Structure */}
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardHeader>
                                 <CardTitle>Payment Structure</CardTitle>
                             </CardHeader>
@@ -1040,11 +1040,11 @@ export default function JobDetail() {
                                 {stages.map((stage) => (
                                     <div
                                         key={stage.id}
-                                        className="p-4 bg-gradient-card rounded-lg border border-white/5"
+                                        className="p-4 bg-gradient-card rounded-lg border border-border"
                                     >
                                         <div className="flex items-start justify-between mb-2">
                                             <div className="flex items-center space-x-3">
-                                                <div className="w-8 h-8 rounded-full bg-gradient-solana flex items-center justify-center text-sm font-bold">
+                                                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-sm font-bold">
                                                     {stage.stage_number}
                                                 </div>
                                                 <div>
@@ -1056,7 +1056,7 @@ export default function JobDetail() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="flex items-center space-x-1 text-lg font-bold text-gradient">
+                                            <div className="flex items-center space-x-1 text-lg font-bold text-primary">
                                                 <Coins className="w-5 h-5" />
                                                 <span>{stage.payment.toFixed(2)} SOL</span>
                                             </div>
@@ -1070,15 +1070,15 @@ export default function JobDetail() {
                     {/* Sidebar */}
                     <div className="space-y-6">
                         {/* Recruiter Info */}
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardHeader>
                                 <CardTitle>About the Recruiter</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="flex items-center space-x-3">
-                                    <Avatar className="w-16 h-16 border-2 border-white/10">
+                                    <Avatar className="w-16 h-16 border-2 border-border">
                                         <AvatarImage src={recruiterProfile?.avatar_url || undefined} />
-                                        <AvatarFallback className="bg-gradient-solana text-background text-xl font-semibold">
+                                        <AvatarFallback className="bg-primary text-background text-xl font-semibold">
                                             {recruiterProfile?.full_name?.charAt(0) || "?"}
                                         </AvatarFallback>
                                     </Avatar>
@@ -1104,7 +1104,7 @@ export default function JobDetail() {
 
                         {/* Apply Button */}
                         {userRole === "freelancer" && (
-                            <Card className="glass border-white/10">
+                            <Card className="bg-card border-border">
                                 <CardContent className="pt-6">
                                     {hasApplied ? (
                                         <div className="space-y-3">
@@ -1118,7 +1118,7 @@ export default function JobDetail() {
                                         </div>
                                     ) : (
                                         <Button
-                                            className="w-full bg-gradient-solana text-lg py-6"
+                                            className="w-full bg-primary text-lg py-6"
                                             onClick={() => setShowApplicationModal(true)}
                                         >
                                             Apply for this Job
@@ -1130,7 +1130,7 @@ export default function JobDetail() {
 
                         {/* Active Project Button (for Recruiter) */}
                         {userRole === "recruiter" && job?.recruiter_id === user?.id && activeProjectId && (
-                            <Card className="glass border-white/10 border-primary/30">
+                            <Card className="bg-card border-border border-primary/30">
                                 <CardContent className="pt-6">
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-center space-x-2 text-primary">
@@ -1141,7 +1141,7 @@ export default function JobDetail() {
                                             View milestone submissions and manage project progress
                                         </p>
                                         <Button
-                                            className="w-full bg-gradient-solana text-lg py-6"
+                                            className="w-full bg-primary text-lg py-6"
                                             onClick={() => navigate(`/projects/${activeProjectId}`)}
                                         >
                                             View Project Workspace
@@ -1152,7 +1152,7 @@ export default function JobDetail() {
                         )}
 
                         {/* Staking Info */}
-                        <Card className="glass border-white/10 border-warning/30">
+                        <Card className="bg-card border-border border-warning/30">
                             <CardHeader>
                                 <CardTitle className="text-sm">Payment Security</CardTitle>
                             </CardHeader>

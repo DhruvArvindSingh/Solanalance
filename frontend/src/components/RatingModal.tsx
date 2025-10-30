@@ -210,7 +210,7 @@ export const RatingModal = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[600px] glass border-white/10 max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[600px] bg-card border-border max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="text-2xl">Rate Your Experience</DialogTitle>
                     <DialogDescription>
@@ -304,7 +304,7 @@ export const RatingModal = ({
                                 qualityRating === 0 ||
                                 professionalismRating === 0
                             }
-                            className="flex-1 bg-gradient-solana"
+                            className="flex-1 bg-primary"
                         >
                             {isSubmitting ? "Submitting..." : "Submit Rating"}
                         </Button>

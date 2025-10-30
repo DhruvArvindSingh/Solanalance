@@ -213,7 +213,7 @@ export function TransactionHistory({ projectId, className = "" }: TransactionHis
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-lg font-bold text-gradient">
+                                                <div className="text-lg font-bold text-primary">
                                                     {transaction.amount.toFixed(4)} SOL
                                                 </div>
                                                 {getStatusBadge(transaction.status)}

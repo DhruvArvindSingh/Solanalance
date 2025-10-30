@@ -2,7 +2,7 @@ import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Users, Search, FileText, CheckCircle, Coins, Shield, Clock } from "lucide-react";
+import { ArrowLeft, Users, Search, FileText, CheckCircle, Coins, Shield, Clock, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const HowItWorks = () => {
@@ -56,6 +56,18 @@ const HowItWorks = () => {
                 "Blockchain-verified payments",
                 "Automatic fund release on approval"
             ]
+        },
+        {
+            step: 5,
+            title: "Withdraw Milestone Payments",
+            description: "After each milestone approval by the recruiter, you can instantly pull your earned payment from the escrow to your wallet.",
+            icon: <Wallet className="w-8 h-8 text-primary" />,
+            details: [
+                "Instant withdrawal after approval",
+                "Pull funds directly from escrow",
+                "No waiting periods or delays",
+                "Complete control over your earnings"
+            ]
         }
     ];
 
@@ -95,7 +107,7 @@ const HowItWorks = () => {
 
                     <div className="text-center mb-16">
                         <h1 className="text-5xl font-bold mb-6">
-                            How <span className="text-gradient">SolanaLance</span> Works
+                            How <span className="text-primary">SolanaLance</span> Works
                         </h1>
                         <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
                             Connect with top talent and get your projects done with confidence.
@@ -108,7 +120,7 @@ const HowItWorks = () => {
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8 mb-20">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {steps.map((step, index) => (
-                            <Card key={index} className="glass border-white/10 relative overflow-hidden">
+                            <Card key={index} className="bg-card border-border relative overflow-hidden">
                                 <CardHeader className="pb-4">
                                     <div className="flex items-start justify-between mb-4">
                                         <div className="flex items-center space-x-4">
@@ -151,7 +163,7 @@ const HowItWorks = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {features.map((feature, index) => (
-                            <Card key={index} className="glass border-white/10 text-center">
+                            <Card key={index} className="bg-card border-border text-center">
                                 <CardContent className="pt-8">
                                     <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                                         {feature.icon}
@@ -166,7 +178,7 @@ const HowItWorks = () => {
 
                 {/* CTA */}
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                    <Card className="glass border-white/10 bg-gradient-to-r from-primary/5 to-secondary/5">
+                    <Card className="bg-card border-border bg-gradient-to-r from-primary/5 to-secondary/5">
                         <CardContent className="text-center py-12">
                             <h3 className="text-2xl font-bold mb-4">Ready to Get Started?</h3>
                             <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
@@ -175,7 +187,7 @@ const HowItWorks = () => {
                             <div className="flex flex-col sm:flex-row gap-4 justify-center">
                                 <Button
                                     size="lg"
-                                    className="bg-gradient-solana"
+                                    className="bg-primary"
                                     onClick={() => navigate("/auth")}
                                 >
                                     Sign Up Now

@@ -110,17 +110,17 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="min-h-screen flex items-center justify-center p-4 grid-pattern">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-solana flex items-center justify-center mx-auto mb-4">
-            <Briefcase className="w-8 h-8 text-background" />
+          <div className="w-16 h-16 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
+            <Briefcase className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-gradient mb-2">SolanaLance</h1>
+          <h1 className="text-3xl font-bold mb-2">SolanaLance</h1>
           <p className="text-muted-foreground">Join the decentralized freelancing revolution</p>
         </div>
 
-        <Card className="glass border-white/10">
+        <Card className="modern-card">
           <CardHeader>
             <CardTitle>Welcome</CardTitle>
             <CardDescription>Sign in or create your account</CardDescription>
@@ -156,7 +156,7 @@ export default function Auth() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full bg-gradient-solana" disabled={loading}>
+                  <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
                     {loading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
@@ -204,7 +204,7 @@ export default function Auth() {
                       <Button
                         type="button"
                         variant={role === "freelancer" ? "default" : "outline"}
-                        className={role === "freelancer" ? "bg-gradient-solana" : ""}
+                        className={role === "freelancer" ? "bg-primary hover:bg-primary/90" : ""}
                         onClick={() => setRole("freelancer")}
                       >
                         <UserCircle className="w-4 h-4 mr-2" />
@@ -213,7 +213,7 @@ export default function Auth() {
                       <Button
                         type="button"
                         variant={role === "recruiter" ? "default" : "outline"}
-                        className={role === "recruiter" ? "bg-gradient-solana" : ""}
+                        className={role === "recruiter" ? "bg-primary hover:bg-primary/90" : ""}
                         onClick={() => setRole("recruiter")}
                       >
                         <Briefcase className="w-4 h-4 mr-2" />
@@ -264,7 +264,7 @@ export default function Auth() {
                             variant="outline"
                             size="sm"
                             onClick={() => setVisible(true)}
-                            className="bg-gradient-solana text-white hover:bg-gradient-solana/90"
+                            className="bg-primary hover:bg-primary/90"
                           >
                             <Wallet className="w-4 h-4 mr-2" />
                             Select Wallet
@@ -273,7 +273,7 @@ export default function Auth() {
                       )}
                     </div>
                   </div>
-                  <Button type="submit" className="w-full bg-gradient-solana" disabled={loading}>
+                  <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
                     {loading ? "Creating account..." : "Sign Up"}
                   </Button>
                 </form>

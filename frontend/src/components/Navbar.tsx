@@ -52,15 +52,15 @@ export const Navbar = () => {
   }, [isMobileMenuOpen]);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/10">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo */}
           <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate("/")}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-solana flex items-center justify-center">
-              <Briefcase className="w-6 h-6 text-background" />
+            <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Briefcase className="w-6 h-6 text-primary" />
             </div>
-            <span className="text-xl font-bold text-gradient">SolanaLance</span>
+            <span className="text-xl font-bold">SolanaLance</span>
           </div>
 
           {/* Desktop Navigation */}
@@ -98,14 +98,14 @@ export const Navbar = () => {
             {user ? (
               <>
                 <div className="hidden sm:block">
-                  <WalletMultiButton className="!bg-gradient-to-r !from-success !to-primary !h-10 !rounded-lg" />
+                  <WalletMultiButton className="!bg-primary hover:!bg-primary/90 !h-10 !rounded-lg" />
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                       <Avatar>
                         <AvatarImage src={user.avatarUrl || undefined} />
-                        <AvatarFallback className="bg-gradient-solana text-background">
+                        <AvatarFallback className="bg-primary/10 border border-primary/20 text-primary">
                           {(user.fullName?.charAt(0) || user.email?.charAt(0) || "?").toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -160,7 +160,7 @@ export const Navbar = () => {
                 <Button variant="ghost" className="hidden sm:flex" onClick={() => navigate("/auth")}>
                   Sign In
                 </Button>
-                <Button className="bg-gradient-solana hover:opacity-90 border-0" onClick={() => navigate("/auth")}>
+                <Button className="bg-primary hover:bg-primary/90" onClick={() => navigate("/auth")}>
                   Get Started
                 </Button>
               </>
@@ -193,10 +193,10 @@ export const Navbar = () => {
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-border/30">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-solana flex items-center justify-center">
-                    <Briefcase className="w-5 h-5 text-background" />
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <Briefcase className="w-5 h-5 text-primary" />
                   </div>
-                  <span className="text-lg font-bold text-gradient">SolanaLance</span>
+                  <span className="text-lg font-bold">SolanaLance</span>
                 </div>
                 <Button variant="ghost" size="icon" onClick={closeMobileMenu}>
                   <X className="w-5 h-5" />
@@ -306,7 +306,7 @@ export const Navbar = () => {
                     <div className="flex items-center space-x-3 p-3 bg-muted/30 rounded-lg">
                       <Avatar className="w-8 h-8">
                         <AvatarImage src={user.avatarUrl || undefined} />
-                        <AvatarFallback className="bg-gradient-solana text-background text-sm">
+                        <AvatarFallback className="bg-primary/10 border border-primary/20 text-primary text-sm">
                           {(user.fullName?.charAt(0) || user.email?.charAt(0) || "?").toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -319,7 +319,7 @@ export const Navbar = () => {
                     </div>
 
                     <div className="block sm:hidden">
-                      <WalletMultiButton className="!bg-gradient-to-r !from-success !to-primary !h-10 !rounded-lg !w-full" />
+                      <WalletMultiButton className="!bg-primary hover:!bg-primary/90 !h-10 !rounded-lg !w-full" />
                     </div>
 
                     <Button
@@ -347,7 +347,7 @@ export const Navbar = () => {
                       Sign In
                     </Button>
                     <Button
-                      className="w-full bg-gradient-solana hover:opacity-90 border-0"
+                      className="w-full bg-primary hover:bg-primary/90"
                       onClick={() => {
                         navigate("/auth");
                         closeMobileMenu();

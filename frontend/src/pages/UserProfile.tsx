@@ -182,12 +182,12 @@ export default function UserProfile() {
                 </Button>
 
                 {/* Profile Header */}
-                <Card className="glass border-white/10 mb-8">
+                <Card className="bg-card border-border mb-8">
                     <CardContent className="pt-8">
                         <div className="flex flex-col md:flex-row items-start md:items-center space-y-6 md:space-y-0 md:space-x-8">
-                            <Avatar className="w-32 h-32 border-4 border-white/10">
+                            <Avatar className="w-32 h-32 border-4 border-border">
                                 <AvatarImage src={profile.avatar_url || undefined} />
-                                <AvatarFallback className="bg-gradient-solana text-background text-4xl font-bold">
+                                <AvatarFallback className="bg-primary text-background text-4xl font-bold">
                                     {profile.full_name.charAt(0)}
                                 </AvatarFallback>
                             </Avatar>
@@ -361,7 +361,7 @@ export default function UserProfile() {
                 {/* Stats Row */}
                 {trustPoints && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardContent className="pt-6 text-center">
                                 <Briefcase className="w-8 h-8 text-primary mx-auto mb-2" />
                                 <p className="text-2xl font-bold">{trustPoints.completed_projects}</p>
@@ -369,7 +369,7 @@ export default function UserProfile() {
                             </CardContent>
                         </Card>
 
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardContent className="pt-6 text-center">
                                 <Star className="w-8 h-8 text-warning mx-auto mb-2" />
                                 <p className="text-2xl font-bold">
@@ -379,7 +379,7 @@ export default function UserProfile() {
                             </CardContent>
                         </Card>
 
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardContent className="pt-6 text-center">
                                 <TrendingUp className="w-8 h-8 text-success mx-auto mb-2" />
                                 <p className="text-2xl font-bold">{successRate.toFixed(0)}%</p>
@@ -387,7 +387,7 @@ export default function UserProfile() {
                             </CardContent>
                         </Card>
 
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardContent className="pt-6 text-center">
                                 <Award className="w-8 h-8 text-secondary mx-auto mb-2" />
                                 <p className="text-2xl font-bold">{trustPoints.total_points}</p>
@@ -398,7 +398,7 @@ export default function UserProfile() {
                 )}
 
                 {/* Reviews */}
-                <Card className="glass border-white/10">
+                <Card className="bg-card border-border">
                     <CardHeader>
                         <CardTitle>Reviews ({ratings.length})</CardTitle>
                     </CardHeader>
@@ -406,11 +406,11 @@ export default function UserProfile() {
                         {ratings.length > 0 ? (
                             <div className="space-y-6">
                                 {ratings.map((rating) => (
-                                    <div key={rating.id} className="pb-6 last:pb-0 last:border-0 border-b border-white/5">
+                                    <div key={rating.id} className="pb-6 last:pb-0 last:border-0 border-b border-border">
                                         <div className="flex items-start space-x-4">
                                             <Avatar className="w-12 h-12">
                                                 <AvatarImage src={rating.rater.avatar_url || undefined} />
-                                                <AvatarFallback className="bg-gradient-solana text-background">
+                                                <AvatarFallback className="bg-primary text-background">
                                                     {rating.rater.full_name.charAt(0)}
                                                 </AvatarFallback>
                                             </Avatar>

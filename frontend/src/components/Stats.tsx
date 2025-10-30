@@ -39,15 +39,15 @@ export const Stats = () => {
   return (
     <section className="py-20 relative">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="p-8 sm:p-12 rounded-3xl glass border border-white/10 bg-gradient-card fade-in">
+        <div className="p-8 sm:p-12 rounded-lg modern-card fade-in">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
-                <div className="text-4xl sm:text-5xl font-bold text-gradient mb-2">
+                <div className="text-4xl sm:text-5xl font-bold text-primary mb-2">
                   {counters[index].toLocaleString()}
                   {stat.suffix}
                 </div>
-                <div className="text-muted-foreground text-sm sm:text-base">
+                <div className="text-muted-foreground text-sm sm:text-base font-medium">
                   {stat.label}
                 </div>
               </div>

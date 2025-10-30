@@ -36,9 +36,9 @@ export const JobPaymentStructure = ({
             </Alert>
 
             {/* Stage 1 */}
-            <div className="p-6 bg-gradient-card rounded-xl border border-white/10 space-y-4">
+            <div className="p-6 bg-gradient-card rounded-xl border border-border space-y-4">
                 <div className="flex items-center space-x-2 mb-4">
-                    <div className="w-8 h-8 rounded-full bg-gradient-solana flex items-center justify-center text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-sm font-bold">
                         1
                     </div>
                     <h3 className="text-lg font-semibold">Stage 1: Initial Work</h3>
@@ -90,9 +90,9 @@ export const JobPaymentStructure = ({
             </div>
 
             {/* Stage 2 */}
-            <div className="p-6 bg-gradient-card rounded-xl border border-white/10 space-y-4">
+            <div className="p-6 bg-gradient-card rounded-xl border border-border space-y-4">
                 <div className="flex items-center space-x-2 mb-4">
-                    <div className="w-8 h-8 rounded-full bg-gradient-solana flex items-center justify-center text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-sm font-bold">
                         2
                     </div>
                     <h3 className="text-lg font-semibold">Stage 2: Midpoint Milestone</h3>
@@ -144,9 +144,9 @@ export const JobPaymentStructure = ({
             </div>
 
             {/* Stage 3 */}
-            <div className="p-6 bg-gradient-card rounded-xl border border-white/10 space-y-4">
+            <div className="p-6 bg-gradient-card rounded-xl border border-border space-y-4">
                 <div className="flex items-center space-x-2 mb-4">
-                    <div className="w-8 h-8 rounded-full bg-gradient-solana flex items-center justify-center text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-sm font-bold">
                         3
                     </div>
                     <h3 className="text-lg font-semibold">Stage 3: Final Delivery</h3>
@@ -198,18 +198,18 @@ export const JobPaymentStructure = ({
             </div>
 
             {/* Summary */}
-            <div className="p-6 bg-gradient-solana/10 rounded-xl border border-primary space-y-3">
+            <div className="p-6 bg-primary/10 rounded-xl border border-primary space-y-3">
                 <div className="flex justify-between items-center">
                     <span className="text-lg font-medium">Total Project Payment:</span>
                     <div className="flex items-center space-x-2">
                         <Coins className="w-6 h-6 text-secondary" />
-                        <span className="text-3xl font-bold text-gradient">
+                        <span className="text-3xl font-bold text-primary">
                             {formData.totalPayment.toFixed(2)} SOL
                         </span>
                     </div>
                 </div>
 
-                <div className="pt-3 border-t border-white/10">
+                <div className="pt-3 border-t border-border">
                     <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">
                             Minimum Stake Required (20%):

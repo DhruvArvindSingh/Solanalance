@@ -238,7 +238,7 @@ export const ApplicationModal = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto glass border-white/10">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-card border-border">
                 <DialogHeader>
                     <DialogTitle>Apply for Job</DialogTitle>
                     <DialogDescription>{jobTitle}</DialogDescription>
@@ -439,7 +439,7 @@ export const ApplicationModal = ({
                                                         setSelectedWalletAddress(publicKey.toBase58());
                                                         setWalletSelectionMethod("connect");
                                                     }}
-                                                    className="w-full bg-gradient-solana"
+                                                    className="w-full bg-primary"
                                                     disabled={selectedWalletAddress === publicKey.toBase58()}
                                                 >
                                                     {selectedWalletAddress === publicKey.toBase58() ? "Selected ✓" : "Use This Wallet"}
@@ -455,7 +455,7 @@ export const ApplicationModal = ({
                                                 <Button
                                                     type="button"
                                                     onClick={handleConnectWallet}
-                                                    className="bg-gradient-solana"
+                                                    className="bg-primary"
                                                 >
                                                     <Link className="w-4 h-4 mr-2" />
                                                     Connect Wallet
@@ -579,7 +579,7 @@ export const ApplicationModal = ({
                         </Button>
                         <Button
                             type="submit"
-                            className="bg-gradient-solana"
+                            className="bg-primary"
                             disabled={loading || !estimatedDays.trim() || !selectedWalletAddress.trim()}
                         >
                             {loading ? (

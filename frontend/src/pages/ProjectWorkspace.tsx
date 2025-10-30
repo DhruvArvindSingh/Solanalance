@@ -715,7 +715,7 @@ export default function ProjectWorkspace() {
                 </div>
 
                 {/* Job Details Section */}
-                <Card className="glass border-white/10 mb-8">
+                <Card className="bg-card border-border mb-8">
                     <CardHeader>
                         <CardTitle>Job Details</CardTitle>
                     </CardHeader>
@@ -742,7 +742,7 @@ export default function ProjectWorkspace() {
                             </div>
                             <div>
                                 <Label className="text-sm font-medium text-muted-foreground">Total Payment</Label>
-                                <div className="flex items-center space-x-1 text-xl font-bold text-gradient">
+                                <div className="flex items-center space-x-1 text-xl font-bold text-primary">
                                     <Coins className="w-5 h-5" />
                                     <span>{project.job.total_payment.toFixed(2)} SOL</span>
                                 </div>
@@ -789,7 +789,7 @@ export default function ProjectWorkspace() {
 
                 {/* Freelancer Information (for Recruiters) */}
                 {isRecruiter && counterpartyInfo && (
-                    <Card className="glass border-white/10 mb-8">
+                    <Card className="bg-card border-border mb-8">
                         <CardHeader>
                             <CardTitle>Freelancer Information</CardTitle>
                         </CardHeader>
@@ -825,7 +825,7 @@ export default function ProjectWorkspace() {
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Progress Timeline */}
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardHeader>
                                 <CardTitle>Project Progress</CardTitle>
                             </CardHeader>
@@ -834,7 +834,7 @@ export default function ProjectWorkspace() {
                                     {/* Progress Bar */}
                                     <div className="h-2 bg-muted rounded-full mb-8">
                                         <div
-                                            className="h-full bg-gradient-solana rounded-full transition-all duration-500"
+                                            className="h-full bg-primary rounded-full transition-all duration-500"
                                             style={{ width: `${getStageProgress()}%` }}
                                         />
                                     </div>
@@ -848,7 +848,7 @@ export default function ProjectWorkspace() {
                                             >
                                                 <div
                                                     className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold mb-2 ${milestone.payment_released
-                                                        ? "bg-gradient-solana text-background"
+                                                        ? "bg-primary text-background"
                                                         : milestone.stage_number === project.current_stage
                                                             ? "bg-primary text-primary-foreground"
                                                             : "bg-muted text-muted-foreground"
@@ -863,7 +863,7 @@ export default function ProjectWorkspace() {
                                                 <p className="text-xs text-center font-medium mb-1">
                                                     Stage {milestone.stage_number}
                                                 </p>
-                                                <div className="flex items-center space-x-1 text-xs text-gradient font-semibold">
+                                                <div className="flex items-center space-x-1 text-xs text-primary font-semibold">
                                                     <Coins className="w-3 h-3" />
                                                     <span>{milestone.payment_amount.toFixed(2)} SOL</span>
                                                 </div>
@@ -878,7 +878,7 @@ export default function ProjectWorkspace() {
                         {milestones.map((milestone) => (
                             <Card
                                 key={milestone.id}
-                                className="glass border-white/10"
+                                className="bg-card border-border"
                             >
                                 <CardHeader>
                                     <div className="flex items-start justify-between">
@@ -926,7 +926,7 @@ export default function ProjectWorkspace() {
                                                                 [milestone.id]: (milestone.submission_links || []).join('\n')
                                                             }));
                                                         }}
-                                                        className="bg-gradient-solana hover:opacity-90"
+                                                        className="bg-primary hover:opacity-90"
                                                     >
                                                         <Edit className="w-4 h-4 mr-2" />
                                                         Edit & Resubmit
@@ -940,7 +940,7 @@ export default function ProjectWorkspace() {
                                         <span className="text-sm text-muted-foreground">
                                             Payment for this stage
                                         </span>
-                                        <div className="flex items-center space-x-1 text-xl font-bold text-gradient">
+                                        <div className="flex items-center space-x-1 text-xl font-bold text-primary">
                                             <Coins className="w-5 h-5" />
                                             <span>{milestone.payment_amount.toFixed(2)} SOL</span>
                                         </div>
@@ -1089,7 +1089,7 @@ export default function ProjectWorkspace() {
                                                             isSubmitting[milestone.id] ||
                                                             !(submissionDescriptions[milestone.id] || "").trim()
                                                         }
-                                                        className={editingMilestoneId === milestone.id ? "flex-1 bg-gradient-solana" : "w-full bg-gradient-solana"}
+                                                        className={editingMilestoneId === milestone.id ? "flex-1 bg-primary" : "w-full bg-primary"}
                                                     >
                                                         {isSubmitting[milestone.id] ? (
                                                             <>
@@ -1218,7 +1218,7 @@ export default function ProjectWorkspace() {
                                                         isReviewing &&
                                                         reviewingMilestoneId === milestone.id
                                                     }
-                                                    className="flex-1 bg-gradient-solana"
+                                                    className="flex-1 bg-primary"
                                                 >
                                                     {isReviewing &&
                                                         reviewingMilestoneId === milestone.id ? (
@@ -1282,7 +1282,7 @@ export default function ProjectWorkspace() {
                                                     <Button
                                                         onClick={() => handleClaimMilestone(milestone)}
                                                         disabled={isClaimingPayment[milestone.id]}
-                                                        className="w-full bg-gradient-solana"
+                                                        className="w-full bg-primary"
                                                     >
                                                         {isClaimingPayment[milestone.id] ? (
                                                             <>
@@ -1330,7 +1330,7 @@ export default function ProjectWorkspace() {
                     {/* Sidebar */}
                     <div className="space-y-6">
                         {/* Payment Summary */}
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <CardTitle>Payment Summary</CardTitle>
@@ -1382,7 +1382,7 @@ export default function ProjectWorkspace() {
                                     <Separator />
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Remaining:</span>
-                                        <span className="text-xl font-bold text-gradient">
+                                        <span className="text-xl font-bold text-primary">
                                             {escrowData ?
                                                 (escrowData.currentStaked - escrowData.claimable).toFixed(2) :
                                                 (project.staking.total_staked - project.staking.total_released).toFixed(2)
@@ -1407,7 +1407,7 @@ export default function ProjectWorkspace() {
                         </Card>
 
                         {/* Project Status */}
-                        <Card className="glass border-white/10">
+                        <Card className="bg-card border-border">
                             <CardHeader>
                                 <CardTitle>Project Status</CardTitle>
                             </CardHeader>
@@ -1445,7 +1445,7 @@ export default function ProjectWorkspace() {
                     {/* Project Completed - Rating CTA */}
                     <div className="space-y-6">
                         {project.status === "completed" && !hasRated && counterpartyInfo && (
-                            <Card className="glass border-success/30 bg-success/5">
+                            <Card className="bg-card border-success/30 bg-success/5">
                                 <CardContent className="pt-6">
                                     <div className="text-center space-y-4">
                                         <h3 className="text-lg font-semibold">Project Completed! 🎉</h3>
@@ -1454,7 +1454,7 @@ export default function ProjectWorkspace() {
                                         </p>
                                         <Button
                                             onClick={() => setShowRatingModal(true)}
-                                            className="bg-gradient-solana"
+                                            className="bg-primary"
                                         >
                                             Rate & Review
                                         </Button>
