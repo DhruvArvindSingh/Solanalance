@@ -558,14 +558,29 @@ router.post('/:id/sync-blockchain', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'No project found for this job' });
         }
 
-        // Check if all milestones are approved on blockchain
-        const allMilestonesApproved = escrowDetails.milestones?.every((m: any) => m.approved === true) || false;
+        // Check if all 3 milestones are approved on blockchain
+        const allMilestonesApproved = escrowDetails.milestones?.length === 3 && 
+                                      escrowDetails.milestones?.every((m: any) => m.approved === true);
 
-        if (allMilestonesApproved && project.status !== 'completed') {
-            await req.prisma.project.update({
-                where: { id: project.id },
-                data: { status: 'completed' }
-            });
+        if (allMilestonesApproved) {
+            // Update project status to completed if not already
+            if (project.status !== 'completed') {
+                await req.prisma.project.update({
+                    where: { id: project.id },
+                    data: { 
+                        status: 'completed',
+                        completedAt: new Date()
+                    }
+                });
+            }
+
+            // Update job status to completed if not already
+            if (job.status !== 'completed') {
+                await req.prisma.job.update({
+                    where: { id: jobId },
+                    data: { status: 'completed' }
+                });
+            }
         }
 
         const currentStaking = project.stakings[0];

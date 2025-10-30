@@ -18,6 +18,7 @@ import conversationRoutes from './routes/conversations';
 import directMessageRoutes from './routes/directMessages';
 import escrowRoutes from './routes/escrow';
 import uploadRoutes from './routes/upload';
+import supportRoutes from './routes/support';
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/direct-messages', directMessageRoutes);
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/support', supportRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

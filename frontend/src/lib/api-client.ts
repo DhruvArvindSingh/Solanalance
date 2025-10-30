@@ -431,6 +431,28 @@ class ApiClient {
         },
     };
 
+    // Support endpoints
+    support = {
+        submitReclaimInquiry: async (data: {
+            jobId: string;
+            jobTitle: string;
+            recruiterEmail?: string;
+            recruiterName?: string;
+            totalStaked: number;
+            milestoneStatuses: Array<{
+                index: number;
+                amount: number;
+                approved: boolean;
+                claimed: boolean;
+            }>;
+        }) => {
+            return this.request('/support/reclaim-inquiry', {
+                method: 'POST',
+                body: JSON.stringify(data),
+            });
+        },
+    };
+
     // Utility functions to match Supabase API pattern
     from(table: string) {
         return {

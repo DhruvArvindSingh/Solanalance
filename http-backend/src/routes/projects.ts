@@ -40,6 +40,13 @@ router.get('/my-projects', authenticateToken, async (req, res) => {
                         recruiterWallet: true,
                         freelancerWallet: true
                     }
+                },
+                milestones: {
+                    select: {
+                        paymentAmount: true,
+                        paymentReleased: true,
+                        status: true
+                    }
                 }
             },
             orderBy: {
@@ -47,25 +54,39 @@ router.get('/my-projects', authenticateToken, async (req, res) => {
             }
         });
 
-        const transformedProjects = projects.map(project => ({
-            id: project.id,
-            status: project.status,
-            current_stage: project.currentStage,
-            started_at: project.startedAt,
-            job: {
-                id: project.job.id,
-                title: project.job.title,
-                description: project.job.description,
-                total_payment: parseFloat(project.job.totalPayment.toString()),
-                skills_required: project.job.skills || [],
-                experience_level: project.job.experienceLevel || '',
-                duration: project.job.projectDuration || '',
-                status: project.job.status,
-                created_at: project.job.createdAt,
-                recruiter_wallet: project.job.recruiterWallet,
-                freelancer_wallet: project.job.freelancerWallet
-            }
-        }));
+        const transformedProjects = projects.map(project => {
+            // Calculate claimed amount (milestones that have been claimed)
+            const claimedAmount = project.milestones
+                .filter(m => m.paymentReleased)
+                .reduce((sum, m) => sum + parseFloat(m.paymentAmount.toString()), 0);
+            
+            // Calculate approved amount (milestones approved but not claimed yet)
+            const approvedAmount = project.milestones
+                .filter(m => m.status === 'approved' && !m.paymentReleased)
+                .reduce((sum, m) => sum + parseFloat(m.paymentAmount.toString()), 0);
+
+            return {
+                id: project.id,
+                status: project.status,
+                current_stage: project.currentStage,
+                started_at: project.startedAt,
+                claimed_amount: claimedAmount,
+                approved_amount: approvedAmount,
+                job: {
+                    id: project.job.id,
+                    title: project.job.title,
+                    description: project.job.description,
+                    total_payment: parseFloat(project.job.totalPayment.toString()),
+                    skills_required: project.job.skills || [],
+                    experience_level: project.job.experienceLevel || '',
+                    duration: project.job.projectDuration || '',
+                    status: project.job.status,
+                    created_at: project.job.createdAt,
+                    recruiter_wallet: project.job.recruiterWallet,
+                    freelancer_wallet: project.job.freelancerWallet
+                }
+            };
+        });
 
         res.json(transformedProjects);
     } catch (error) {
@@ -230,6 +251,42 @@ router.put('/milestone/:id/submit', authenticateToken, upload.array('files', 5),
         // Check if project is active
         if (milestone.project.status !== 'active') {
             return res.status(400).json({ error: 'Project is not active' });
+        }
+
+        // Check if previous milestones are in valid states
+        if (milestone.stageNumber > 1) {
+            const previousMilestones = await req.prisma.milestone.findMany({
+                where: {
+                    projectId: milestone.projectId,
+                    stageNumber: {
+                        lt: milestone.stageNumber
+                    }
+                },
+                orderBy: {
+                    stageNumber: 'asc'
+                }
+            });
+
+            // Check if all previous milestones are in valid states
+            const validStates = ['submitted', 'approved', 'claimed'];
+            const invalidPreviousMilestone = previousMilestones.find(
+                m => !validStates.includes(m.status)
+            );
+
+            if (invalidPreviousMilestone) {
+                const stageNumber = invalidPreviousMilestone.stageNumber;
+                const status = invalidPreviousMilestone.status;
+                
+                if (status === 'revision_requested') {
+                    return res.status(400).json({ 
+                        error: `Cannot submit this milestone. Milestone ${stageNumber} requires changes to be addressed first.` 
+                    });
+                } else {
+                    return res.status(400).json({ 
+                        error: `Cannot submit this milestone. Milestone ${stageNumber} must be submitted first.` 
+                    });
+                }
+            }
         }
 
         // Parse submission links
@@ -684,7 +741,28 @@ router.post('/sync-blockchain', authenticateToken, async (req, res) => {
             }
         }
 
-        // Check if all milestones are claimed (project completed)
+        // Check if all 3 milestones are approved on blockchain
+        const allMilestonesApproved = escrowDetails.milestones.length === 3 && 
+                                      escrowDetails.milestones.every(m => m.approved);
+        
+        if (allMilestonesApproved && project.status !== 'completed') {
+            await req.prisma.project.update({
+                where: { id: project.id },
+                data: {
+                    status: 'completed',
+                    completedAt: new Date()
+                }
+            });
+
+            await req.prisma.job.update({
+                where: { id: jobId },
+                data: { status: 'completed' }
+            });
+
+            updates.changes.push('Project marked as completed (all milestones approved)');
+        }
+
+        // Also check if all milestones are claimed (project completed)
         const allMilestonesClaimed = escrowDetails.milestones.every(m => m.claimed);
         if (allMilestonesClaimed && project.status !== 'completed') {
             await req.prisma.project.update({
@@ -700,7 +778,7 @@ router.post('/sync-blockchain', authenticateToken, async (req, res) => {
                 data: { status: 'completed' }
             });
 
-            updates.changes.push('Project marked as completed');
+            updates.changes.push('Project marked as completed (all milestones claimed)');
         }
 
         // Update staking record with current funds

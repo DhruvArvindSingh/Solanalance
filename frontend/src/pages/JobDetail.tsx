@@ -35,6 +35,7 @@ import {
     Shield,
     AlertCircle,
     Edit,
+    RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -128,6 +129,9 @@ export default function JobDetail() {
     const [isApproving, setIsApproving] = useState(false);
     const [isRequestingChanges, setIsRequestingChanges] = useState(false);
     const [claimingMilestoneId, setClaimingMilestoneId] = useState<string | null>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [isCanceling, setIsCanceling] = useState(false);
 
     const { connection } = useConnection();
     const wallet = useWallet();
@@ -509,6 +513,197 @@ export default function JobDetail() {
         }
     };
 
+    const handleVerifyFunds = async () => {
+        if (!job?.recruiter_wallet) {
+            toast.error("Recruiter wallet address not found");
+            return;
+        }
+
+        setIsVerifying(true);
+
+        try {
+            toast.info("Verifying funds on blockchain...");
+
+            const { verifyEscrowFunds } = await import("@/lib/escrow-operations");
+            const result = await verifyEscrowFunds(
+                job.recruiter_wallet,
+                job.id,
+                job.freelancer_wallet || undefined,
+                job.total_payment
+            );
+
+            if (result.verified) {
+                toast.success(`✓ Funds verified! ${result.balance?.toFixed(4)} SOL locked in escrow`, {
+                    description: `PDA: ${result.escrowPDA?.substring(0, 20)}...`
+                });
+            } else {
+                toast.error(`Verification failed: ${result.error}`);
+            }
+        } catch (error: any) {
+            console.error("Error verifying funds:", error);
+            toast.error("Failed to verify funds on blockchain");
+        } finally {
+            setIsVerifying(false);
+        }
+    };
+
+    const handleSyncBlockchain = async () => {
+        if (!job?.recruiter_wallet) {
+            toast.error("Recruiter wallet address not found");
+            return;
+        }
+
+        setIsSyncing(true);
+
+        try {
+            toast.info("Syncing with blockchain...");
+
+            const { error } = await apiClient.projects.syncWithBlockchain({
+                jobId: job.id,
+                recruiterWallet: job.recruiter_wallet
+            });
+
+            if (error) {
+                throw new Error(error);
+            }
+
+            toast.success("Successfully synced with blockchain!");
+            
+            // Refresh job details to show updated data
+            await fetchJobDetails();
+        } catch (error: any) {
+            console.error("Error syncing with blockchain:", error);
+            toast.error(error.message || "Failed to sync with blockchain");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handleCancelJob = async () => {
+        if (!wallet.publicKey) {
+            toast.error("Please connect your wallet to cancel the job");
+            return;
+        }
+
+        if (!job) {
+            toast.error("Job information not found");
+            return;
+        }
+
+        setIsCanceling(true);
+
+        try {
+            // First, check if any milestones have been approved
+            if (job.recruiter_wallet) {
+                toast.info("Checking milestone status...");
+                
+                const { getMilestoneStatus } = await import("@/lib/escrow-operations");
+                const milestoneStatuses = await getMilestoneStatus(job.recruiter_wallet, job.id);
+                
+                if (milestoneStatuses) {
+                    const hasApprovedMilestone = milestoneStatuses.some(m => m.approved);
+                    
+                    if (hasApprovedMilestone) {
+                        // Milestone(s) approved - send email inquiry instead
+                        const confirmed = window.confirm(
+                            "One or more milestones have been approved. You cannot cancel the job directly.\n\n" +
+                            "Would you like to submit a fund reclaim inquiry? Our support team will contact you via email to discuss the reclaim process."
+                        );
+
+                        if (!confirmed) {
+                            setIsCanceling(false);
+                            return;
+                        }
+
+                        toast.info("Submitting reclaim inquiry...");
+
+                        // Send email inquiry to support
+                        const { error: emailError } = await apiClient.support.submitReclaimInquiry({
+                            jobId: job.id,
+                            jobTitle: job.title,
+                            recruiterEmail: user?.email,
+                            recruiterName: user?.fullName,
+                            totalStaked: job.total_payment,
+                            milestoneStatuses: milestoneStatuses.map(m => ({
+                                index: m.index,
+                                amount: m.amount,
+                                approved: m.approved,
+                                claimed: m.claimed
+                            }))
+                        });
+
+                        if (emailError) {
+                            throw new Error(emailError);
+                        }
+
+                        toast.success("Reclaim inquiry submitted successfully! Our support team will contact you via email within 24-48 hours.", {
+                            duration: 5000
+                        });
+
+                        setIsCanceling(false);
+                        return;
+                    }
+                }
+            }
+
+            // No milestones approved - proceed with normal cancellation
+            const confirmed = window.confirm(
+                "Are you sure you want to cancel this job?\n\n" +
+                "This will:\n" +
+                "• Close the escrow account\n" +
+                "• Refund the full staked amount to your wallet\n" +
+                "• Mark the job as cancelled\n\n" +
+                "This action cannot be undone."
+            );
+
+            if (!confirmed) {
+                setIsCanceling(false);
+                return;
+            }
+
+            toast.info("Canceling job on blockchain...");
+
+            const { cancelJob } = await import("@/lib/escrow-operations");
+            const result = await cancelJob(wallet, job.id);
+
+            if (!result.success) {
+                throw new Error(result.error || "Failed to cancel job on blockchain");
+            }
+
+            toast.success("Job canceled successfully! Funds have been refunded to your wallet.");
+
+            // Update backend to mark job as cancelled
+            try {
+                const { error } = await apiClient.jobs.update(job.id, { status: 'cancelled' });
+                if (error) {
+                    console.error("Failed to update job status in database:", error);
+                    toast.warning("Job cancelled on blockchain but database update failed. Please refresh.");
+                }
+            } catch (dbError) {
+                console.error("Database update error:", dbError);
+            }
+
+            // Redirect to dashboard after a short delay
+            setTimeout(() => {
+                navigate('/dashboard');
+            }, 2000);
+        } catch (error: any) {
+            console.error("Error canceling job:", error);
+
+            if (error.message?.includes("CannotCancelAfterApproval")) {
+                toast.error(
+                    "Cannot cancel job: At least one milestone has been approved.\n\n" +
+                    "Please use the 'Submit Reclaim Inquiry' option to contact support.",
+                    { duration: 5000 }
+                );
+            } else {
+                toast.error(error.message || "Failed to cancel job");
+            }
+        } finally {
+            setIsCanceling(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-background">
@@ -747,18 +942,65 @@ export default function JobDetail() {
                                         </div>
                                     )}
 
-                                    {/* Verify Funds Button */}
+                                    {/* Blockchain Actions */}
                                     {job.recruiter_wallet && (
-                                        <div className="flex justify-center pt-2">
-                                            <VerifyFundsButton
-                                                jobId={job.id}
-                                                jobTitle={job.title}
-                                                recruiterWallet={job.recruiter_wallet}
-                                                freelancerWallet={job.freelancer_wallet || undefined}
-                                                expectedAmount={job.total_payment}
-                                                variant="default"
-                                                size="default"
-                                            />
+                                        <div className="space-y-3 pt-2">
+                                            {/* Recruiter-only actions */}
+                                            {userRole === 'recruiter' && user?.id === job.recruiter_id && (
+                                                <div className="flex gap-3">
+                                                    <Button
+                                                        onClick={handleVerifyFunds}
+                                                        disabled={isVerifying || isSyncing}
+                                                        variant="outline"
+                                                        className="flex-1"
+                                                    >
+                                                        {isVerifying ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                                Verifying...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Shield className="w-4 h-4 mr-2" />
+                                                                Verify Funds
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                    <Button
+                                                        onClick={handleSyncBlockchain}
+                                                        disabled={isVerifying || isSyncing}
+                                                        variant="outline"
+                                                        className="flex-1"
+                                                    >
+                                                        {isSyncing ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                                Syncing...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <RefreshCw className="w-4 h-4 mr-2" />
+                                                                Sync Blockchain
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Freelancer view - show existing VerifyFundsButton */}
+                                            {userRole === 'freelancer' && (
+                                                <div className="flex justify-center">
+                                                    <VerifyFundsButton
+                                                        jobId={job.id}
+                                                        jobTitle={job.title}
+                                                        recruiterWallet={job.recruiter_wallet}
+                                                        freelancerWallet={job.freelancer_wallet || undefined}
+                                                        expectedAmount={job.total_payment}
+                                                        variant="default"
+                                                        size="default"
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </CardContent>
@@ -1148,6 +1390,43 @@ export default function JobDetail() {
                                             onClick={() => navigate(`/projects/${activeProjectId}`)}
                                         >
                                             View Project Workspace
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Cancel Job Button (for Recruiter) */}
+                        {userRole === "recruiter" && job?.recruiter_id === user?.id && job.status === 'active' && (
+                            <Card className="bg-card border-border border-destructive/30">
+                                <CardContent className="pt-6">
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-center space-x-2 text-destructive">
+                                            <AlertCircle className="w-5 h-5" />
+                                            <span className="font-medium">Cancel Job / Reclaim Funds</span>
+                                        </div>
+                                        <p className="text-sm text-center text-muted-foreground">
+                                            • If no milestones approved: Cancel job and reclaim full staked amount
+                                            <br />
+                                            • If milestones approved: Submit inquiry to support team for reclaim process
+                                        </p>
+                                        <Button
+                                            variant="destructive"
+                                            className="w-full text-lg py-6"
+                                            onClick={handleCancelJob}
+                                            disabled={isCanceling}
+                                        >
+                                            {isCanceling ? (
+                                                <>
+                                                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                                    Processing...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <XCircle className="w-5 h-5 mr-2" />
+                                                    Cancel Job / Reclaim Funds
+                                                </>
+                                            )}
                                         </Button>
                                     </div>
                                 </CardContent>

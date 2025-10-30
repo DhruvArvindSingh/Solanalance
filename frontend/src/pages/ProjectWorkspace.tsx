@@ -628,6 +628,42 @@ export default function ProjectWorkspace() {
         return (project.current_stage / 3) * 100;
     };
 
+    const canSubmitMilestone = (milestone: Milestone) => {
+        if (!project) return false;
+
+        // If this is the first milestone, it can always be submitted
+        if (milestone.stage_number === 1) return true;
+
+        // Check if all previous milestones are in valid states
+        const validStates = ['submitted', 'approved', 'claimed'];
+        const previousMilestones = project.milestones.filter(
+            m => m.stage_number < milestone.stage_number
+        );
+
+        return previousMilestones.every(m => validStates.includes(m.status));
+    };
+
+    const getPreviousMilestoneBlockingMessage = (milestone: Milestone): string | null => {
+        if (!project || milestone.stage_number === 1) return null;
+
+        const validStates = ['submitted', 'approved', 'claimed'];
+        const previousMilestones = project.milestones.filter(
+            m => m.stage_number < milestone.stage_number
+        );
+
+        const blockingMilestone = previousMilestones.find(m => !validStates.includes(m.status));
+        
+        if (blockingMilestone) {
+            if (blockingMilestone.status === 'revision_requested') {
+                return `Cannot submit. Milestone ${blockingMilestone.stage_number} requires changes to be addressed first.`;
+            } else {
+                return `Cannot submit. Milestone ${blockingMilestone.stage_number} must be submitted first.`;
+            }
+        }
+
+        return null;
+    };
+
     const getMilestoneStatusColor = (status: string) => {
         switch (status) {
             case "pending":
@@ -978,6 +1014,16 @@ export default function ProjectWorkspace() {
                                                         </Alert>
                                                     )}
 
+                                                {!canSubmitMilestone(milestone) && (
+                                                    <Alert className="border-destructive/30 bg-destructive/10">
+                                                        <AlertCircle className="h-4 w-4 text-destructive" />
+                                                        <AlertDescription className="text-destructive">
+                                                            <strong>Blocked:</strong>{" "}
+                                                            {getPreviousMilestoneBlockingMessage(milestone)}
+                                                        </AlertDescription>
+                                                    </Alert>
+                                                )}
+
                                                 <div className="space-y-2">
                                                     <Label htmlFor={`description-${milestone.id}`}>
                                                         Describe your work *
@@ -1095,7 +1141,8 @@ export default function ProjectWorkspace() {
                                                         }}
                                                         disabled={
                                                             isSubmitting[milestone.id] ||
-                                                            !(submissionDescriptions[milestone.id] || "").trim()
+                                                            !(submissionDescriptions[milestone.id] || "").trim() ||
+                                                            !canSubmitMilestone(milestone)
                                                         }
                                                         className={editingMilestoneId === milestone.id ? "flex-1 bg-primary" : "w-full bg-primary"}
                                                     >
@@ -1273,7 +1320,7 @@ export default function ProjectWorkspace() {
                                     {!isRecruiter &&
                                         milestone.status === 'approved' &&
                                         !milestone.payment_released &&
-                                        project.status === "active" && (
+                                        (project.status === "active" || project.status === "completed") && (
                                             project.staking.total_staked > 0 ? (
                                                 <div className="p-4 bg-success/5 rounded-lg border border-success/20">
                                                     <div className="flex items-center justify-between mb-3">

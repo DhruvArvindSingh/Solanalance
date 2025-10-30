@@ -31,6 +31,8 @@ interface Project {
     status: string;
     current_stage: number;
     started_at: string;
+    claimed_amount: number;
+    approved_amount: number;
     job: {
         id: string;
         title: string;
@@ -242,8 +244,20 @@ export default function FreelancerDashboard() {
                                             />
                                         ))}
                                     </div>
-                                ) : applications.length > 0 ? (
-                                    applications.map((application) => (
+                                ) : applications.filter(app => {
+                                    // Filter out applications where the job has a completed project
+                                    const hasCompletedProject = projects.some(
+                                        p => p.job.id === app.job_id && p.status === 'completed'
+                                    );
+                                    return !hasCompletedProject;
+                                }).length > 0 ? (
+                                    applications.filter(app => {
+                                        // Filter out applications where the job has a completed project
+                                        const hasCompletedProject = projects.some(
+                                            p => p.job.id === app.job_id && p.status === 'completed'
+                                        );
+                                        return !hasCompletedProject;
+                                    }).map((application) => (
                                         <div
                                             key={application.id}
                                             className="p-4 rounded-lg bg-card border border-border hover:border-border transition-colors cursor-pointer"
@@ -328,22 +342,48 @@ export default function FreelancerDashboard() {
 
                                                     {/* Stage Progress */}
                                                     <div className="flex items-center space-x-2 mt-3">
-                                                        {[1, 2, 3].map((stage) => (
-                                                            <div
-                                                                key={stage}
-                                                                className={`h-2 flex-1 rounded-full ${stage <= project.current_stage
-                                                                    ? "bg-primary"
-                                                                    : "bg-muted"
+                                                        {[1, 2, 3].map((stage) => {
+                                                            const isCompleted = stage < project.current_stage;
+                                                            const isCurrent = stage === project.current_stage;
+                                                            const isPending = stage > project.current_stage;
+                                                            
+                                                            return (
+                                                                <div
+                                                                    key={stage}
+                                                                    className={`h-2 flex-1 rounded-full relative overflow-hidden ${
+                                                                        isPending ? "bg-muted" : "bg-muted"
                                                                     }`}
-                                                            />
-                                                        ))}
+                                                                >
+                                                                    {(isCompleted || isCurrent) && (
+                                                                        <div
+                                                                            className="h-full bg-primary rounded-full transition-all duration-300"
+                                                                            style={{
+                                                                                width: isCompleted ? '100%' : '50%'
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
 
                                                 <div className="flex flex-col items-end space-y-2 ml-4">
-                                                    <div className="flex items-center space-x-1 text-xl font-bold text-primary">
-                                                        <Coins className="w-5 h-5" />
-                                                        <span>{project.job.total_payment.toFixed(2)} SOL</span>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center space-x-1 text-xl font-bold text-primary">
+                                                            <Coins className="w-5 h-5" />
+                                                            <span>{project.job.total_payment.toFixed(2)} SOL</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-end space-x-3 text-xs">
+                                                            <div className="flex items-center space-x-1 text-success">
+                                                                <span className="font-medium">Claimed:</span>
+                                                                <span>{project.claimed_amount.toFixed(2)} SOL</span>
+                                                            </div>
+                                                            <div className="flex items-center space-x-1 text-warning">
+                                                                <span className="font-medium">Approved:</span>
+                                                                <span>{project.approved_amount.toFixed(2)} SOL</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
 
                                                     <div className="flex items-center space-x-2">
@@ -437,9 +477,21 @@ export default function FreelancerDashboard() {
                                                 </div>
 
                                                 <div className="flex flex-col items-end space-y-2 ml-4">
-                                                    <div className="flex items-center space-x-1 text-xl font-bold text-primary">
-                                                        <Coins className="w-5 h-5" />
-                                                        <span>{project.job.total_payment.toFixed(2)} SOL</span>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center space-x-1 text-xl font-bold text-primary">
+                                                            <Coins className="w-5 h-5" />
+                                                            <span>{project.job.total_payment.toFixed(2)} SOL</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-end space-x-3 text-xs">
+                                                            <div className="flex items-center space-x-1 text-success">
+                                                                <span className="font-medium">Claimed:</span>
+                                                                <span>{project.claimed_amount.toFixed(2)} SOL</span>
+                                                            </div>
+                                                            <div className="flex items-center space-x-1 text-warning">
+                                                                <span className="font-medium">Approved:</span>
+                                                                <span>{project.approved_amount.toFixed(2)} SOL</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
 
                                                     <div className="flex items-center space-x-2">
