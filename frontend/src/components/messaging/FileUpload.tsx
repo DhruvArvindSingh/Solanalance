@@ -178,7 +178,7 @@ export const FileUpload = ({
 
             {/* Upload Area */}
             {showUploadArea && selectedFile && (
-                <div className="absolute bottom-14 left-0 right-0 bg-background/95 backdrop-blur-sm border border-border/50 rounded-xl p-4 shadow-lg z-50">
+                <div className="absolute bottom-14 left-0 right-0 bg-background/95 backdrop-blur-sm border border-border/50 rounded-xl p-4 shadow-lg z-30">
                     <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 p-2 bg-muted/50 rounded-lg">
                             {getFileIcon(selectedFile.type)}
@@ -205,7 +205,7 @@ export const FileUpload = ({
                                 ) : (
                                     <Upload className="w-4 h-4" />
                                 )}
-                                {isUploading ? '' : ''}
+
                             </Button>
 
                             <Button

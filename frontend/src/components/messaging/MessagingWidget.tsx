@@ -61,7 +61,7 @@ export const MessagingWidget = () => {
     if (!user) return null;
 
     return (
-        <div className="fixed bottom-0 right-6 z-50">
+        <div className="fixed bottom-0 right-6 z-40">
             {isCollapsed ? (
                 /* Collapsed State - Messenger Button */
                 <Button

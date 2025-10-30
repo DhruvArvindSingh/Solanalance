@@ -30,7 +30,7 @@ export const Navbar = () => {
   // Close mobile menu on screen resize to desktop
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) { // md breakpoint
+      if (window.innerWidth >= 1024) { // lg breakpoint
         setIsMobileMenuOpen(false);
       }
     };
@@ -64,7 +64,7 @@ export const Navbar = () => {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden lg:flex items-center space-x-8">
             {user && (
               <button
                 onClick={() => navigate(userRole === "recruiter" ? "/dashboard/recruiter" : "/dashboard/freelancer")}
@@ -165,7 +165,13 @@ export const Navbar = () => {
                 </Button>
               </>
             )}
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleMobileMenu}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden hover:bg-muted/50 transition-colors"
+              onClick={toggleMobileMenu}
+              aria-label="Toggle mobile menu"
+            >
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
           </div>
@@ -177,12 +183,12 @@ export const Navbar = () => {
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[55] lg:hidden"
             onClick={closeMobileMenu}
           />
 
           {/* Sidebar */}
-          <div className="fixed top-0 right-0 h-full w-80 bg-background/95 backdrop-blur-xl border-l border-border/50 shadow-2xl z-50 md:hidden transform transition-transform duration-300 ease-out">
+          <div className="fixed top-0 right-0 h-full w-80 bg-background border-l border-border/50 shadow-2xl z-[60] lg:hidden">
             <div className="flex flex-col h-full">
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-border/30">
