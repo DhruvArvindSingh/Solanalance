@@ -64,7 +64,7 @@ export const PeopleList = ({ isCompact = false }: PeopleListProps) => {
         return (
             <div className="h-full flex flex-col w-full">
                 <ScrollArea className="flex-1 w-full">
-                    <div className="p-2 space-y-2 w-full">
+                    <div className="p-2 space-y-3 w-full flex flex-col items-center">
                         {filteredUsers.map((user) => (
                             <div
                                 key={user.id}
@@ -75,20 +75,20 @@ export const PeopleList = ({ isCompact = false }: PeopleListProps) => {
                                     }`}
                                 title={`${user.name} - Direct Message`}
                             >
-                                <Avatar className="w-12 h-12 ring-2 ring-background shadow-sm">
+                                <Avatar className="w-14 h-14 ring-2 ring-background shadow-sm">
                                     <AvatarImage src={user.avatar || undefined} />
                                     <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-semibold text-sm">
                                         {user.name?.charAt(0).toUpperCase() || 'U'}
                                     </AvatarFallback>
                                 </Avatar>
-
+                                
                                 {/* Online Status */}
                                 {user.isOnline && (
                                     <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 border-2 border-background rounded-full shadow-sm">
                                         <div className="w-full h-full bg-green-400 rounded-full animate-ping"></div>
                                     </div>
                                 )}
-
+                                
                                 {/* Unread Badge */}
                                 {user.unreadCount > 0 && (
                                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 border-2 border-background rounded-full flex items-center justify-center shadow-sm">
@@ -156,22 +156,22 @@ export const PeopleList = ({ isCompact = false }: PeopleListProps) => {
                         <div
                             key={user.id}
                             onClick={() => selectDirectMessage(user.id)}
-                            className={`p-4 hover:bg-muted/30 cursor-pointer transition-all duration-200 hover:shadow-sm ${selectedDirectMessageUserId === user.id
+                            className={`p-3 hover:bg-muted/30 cursor-pointer transition-all duration-200 hover:shadow-sm ${selectedDirectMessageUserId === user.id
                                 ? 'bg-primary/5 border-r-3 border-primary shadow-sm'
                                 : 'hover:bg-muted/20'
                                 }`}
                         >
-                            <div className="flex items-start gap-4">
+                            <div className="flex items-start gap-3 w-full">
                                 {/* Avatar with Online Status */}
                                 <div className="relative flex-shrink-0">
-                                    <Avatar className="w-12 h-12 ring-2 ring-background shadow-sm">
+                                    <Avatar className="w-11 h-11 ring-2 ring-background shadow-sm">
                                         <AvatarImage src={user.avatar || undefined} />
                                         <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-semibold text-sm">
                                             {user.name?.charAt(0).toUpperCase() || 'U'}
                                         </AvatarFallback>
                                     </Avatar>
                                     {user.isOnline && (
-                                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 border-2 border-background rounded-full shadow-sm animate-pulse">
+                                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-background rounded-full shadow-sm animate-pulse">
                                             <div className="w-full h-full bg-green-400 rounded-full animate-ping"></div>
                                         </div>
                                     )}

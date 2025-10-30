@@ -192,7 +192,7 @@ export const MessagingWidget = () => {
                                 {selectedProjectId || selectedDirectMessageUserId ? (
                                     /* Chat View - Compact Sidebar + Large Chat Area */
                                     <>
-                                        <div className="w-16 border-r border-border/30 bg-muted/10 flex flex-col">
+                                        <div className="w-20 border-r border-border/30 bg-muted/10 flex flex-col">
                                             <ConversationList isCompact={true} />
                                         </div>
                                         <div className="flex-1 bg-background/80 flex flex-col">
