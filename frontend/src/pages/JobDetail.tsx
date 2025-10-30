@@ -1074,7 +1074,10 @@ export default function JobDetail() {
                             <CardHeader>
                                 <CardTitle>About the Recruiter</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent 
+                                className="space-y-4 cursor-pointer hover:bg-accent/50 transition-colors rounded-lg"
+                                onClick={() => navigate(`/profile/${job.recruiter_id}`)}
+                            >
                                 <div className="flex items-center space-x-3">
                                     <Avatar className="w-16 h-16 border-2 border-border">
                                         <AvatarImage src={recruiterProfile?.avatar_url || undefined} />
