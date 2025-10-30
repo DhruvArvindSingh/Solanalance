@@ -159,7 +159,7 @@ export const ConversationList = ({ isCompact = false }: ConversationListProps) =
                                         </div>
                                     </div>
 
-                                    <p className="text-xs text-muted-foreground truncate mb-1.5 font-medium">
+                                    <p className="text-xs text-muted-foreground line-clamp-2 mb-1.5 font-medium break-words">
                                         {conversation.jobTitle}
                                     </p>
 

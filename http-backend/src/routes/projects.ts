@@ -92,7 +92,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
                         experienceLevel: true,
                         projectDuration: true,
                         status: true,
-                        createdAt: true
+                        createdAt: true,
+                        recruiterWallet: true,
+                        freelancerWallet: true
                     }
                 },
                 stakings: {
@@ -108,6 +110,19 @@ router.get('/:id', authenticateToken, async (req, res) => {
                                 name: true,
                                 description: true
                             }
+                        },
+                        transactions: {
+                            where: {
+                                type: 'milestone_payment'
+                            },
+                            select: {
+                                walletSignature: true,
+                                createdAt: true
+                            },
+                            orderBy: {
+                                createdAt: 'desc'
+                            },
+                            take: 1
                         }
                     },
                     orderBy: {
@@ -140,6 +155,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
             reviewer_comments: milestone.reviewerComments,
             payment_released: milestone.paymentReleased,
             payment_amount: parseFloat(milestone.paymentAmount.toString()),
+            transaction_signature: milestone.transactions[0]?.walletSignature || null,
             stage: {
                 name: milestone.stage.name,
                 description: milestone.stage.description
@@ -163,7 +179,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
                 experience_level: project.job.experienceLevel || '',
                 duration: project.job.projectDuration || '',
                 status: project.job.status,
-                created_at: project.job.createdAt
+                created_at: project.job.createdAt,
+                recruiter_wallet: project.job.recruiterWallet,
+                freelancer_wallet: project.job.freelancerWallet
             },
             staking: {
                 total_staked: parseFloat(staking.totalStaked.toString()),
@@ -308,37 +326,9 @@ router.put('/milestone/:id/review', authenticateToken, async (req, res) => {
                 }
             });
 
-            // Update staking record
-            const staking = await req.prisma.staking.findFirst({
-                where: { projectId: milestone.projectId }
-            });
-
-            if (staking) {
-                await req.prisma.staking.update({
-                    where: { id: staking.id },
-                    data: {
-                        totalReleased: {
-                            increment: milestone.paymentAmount
-                        }
-                    }
-                });
-            }
-
-            // Create transaction record
-            await req.prisma.transaction.create({
-                data: {
-                    fromUserId: milestone.project.recruiterId,
-                    toUserId: milestone.project.freelancerId,
-                    projectId: milestone.projectId,
-                    milestoneId: milestone.id,
-                    type: 'payment',
-                    amount: milestone.paymentAmount,
-                    walletFrom: 'recruiter-wallet', // In real app, get from user wallet
-                    walletTo: 'freelancer-wallet', // In real app, get from user wallet
-                    walletSignature: `mock-signature-${Date.now()}`, // In real app, get from blockchain
-                    status: 'confirmed'
-                }
-            });
+            // Note: Staking and transaction records are now updated when the freelancer
+            // actually claims the milestone on the blockchain via the /milestone/:id/claim endpoint
+            // This approval just marks the milestone as approved in the database
 
             // Update project stage if needed
             if (milestone.stageNumber < 3) {

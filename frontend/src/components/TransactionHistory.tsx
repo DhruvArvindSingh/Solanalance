@@ -55,7 +55,12 @@ export function TransactionHistory({ projectId, className = "" }: TransactionHis
                 return;
             }
 
-            setTransactions(response.data?.transactions || []);
+            // Filter out mock transactions (signatures starting with 'mock-signature')
+            const realTransactions = (response.data?.transactions || []).filter(
+                (tx: Transaction) => !tx.wallet_signature.startsWith('mock-signature')
+            );
+
+            setTransactions(realTransactions);
             setProjectTitle(response.data?.project_title || '');
         } catch (error) {
             console.error('Error fetching transactions:', error);

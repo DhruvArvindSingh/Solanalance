@@ -144,7 +144,7 @@ export const ActiveChat = () => {
                         <p className="font-semibold text-foreground truncate text-base">
                             {currentUser?.name}
                         </p>
-                        <p className="text-sm text-muted-foreground truncate">
+                        <p className="text-sm text-muted-foreground line-clamp-2 break-words">
                             {chatTitle}
                         </p>
                     </div>

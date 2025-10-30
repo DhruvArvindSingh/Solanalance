@@ -496,11 +496,11 @@ router.put('/:id', authenticateToken, requireRole('recruiter'), async (req, res)
 router.post('/:id/sync-blockchain', authenticateToken, async (req, res) => {
     try {
         const { id: jobId } = req.params;
-        console.log('Extracted jobId from params:', jobId);
         const userId = req.user!.id;
-        console.log('Extracted userId from request:', userId);
 
-        console.log(`=== BLOCKCHAIN SYNC START for Job ${jobId} ===`);
+        console.log(`\n${'='.repeat(80)}`);
+        console.log(`🔄 BLOCKCHAIN SYNC START - Job: ${jobId}`);
+        console.log(`${'='.repeat(80)}\n`);
 
         // Find the job and verify user has access
         const job = await req.prisma.job.findFirst({
@@ -528,31 +528,23 @@ router.post('/:id/sync-blockchain', authenticateToken, async (req, res) => {
                 }
             }
         });
-        console.log('Job query result:', job ? `Found job: ${job.id}` : 'Job not found');
 
         if (!job) {
-            console.log('Job not found or access denied, returning 404');
             return res.status(404).json({ error: 'Job not found or access denied' });
         }
 
         if (job.status !== 'active' && job.status !== 'completed') {
-            console.log('Job status is not active or completed:', job.status);
             return res.status(400).json({ error: 'Can only sync active or completed jobs' });
         }
 
         if (!job.recruiterWallet) {
-            console.log('Job does not have a recruiter wallet address');
             return res.status(400).json({ error: 'Job does not have a recruiter wallet address' });
         }
 
-        console.log(`Job found: ${job.title}, Recruiter wallet: ${job.recruiterWallet}`);
-
         // Get blockchain data
         const escrowDetails = await getEscrowDetails(job.recruiterWallet, jobId);
-        console.log('Escrow details fetched from blockchain:', escrowDetails.success ? 'Success' : 'Failed');
 
         if (!escrowDetails.success) {
-            console.log(`No escrow found on blockchain: ${escrowDetails.error}`);
             return res.json({
                 status: 'synced',
                 message: 'No escrow exists on blockchain yet',
@@ -561,161 +553,146 @@ router.post('/:id/sync-blockchain', authenticateToken, async (req, res) => {
             });
         }
 
-        console.log('Blockchain escrow data:', escrowDetails);
-
         const project = job.projects[0];
-        console.log('Project extracted:', project ? `Project ID: ${project.id}` : 'No project found');
         if (!project) {
-            console.log('No project found for this job, returning 400');
             return res.status(400).json({ error: 'No project found for this job' });
         }
+
         // Check if all milestones are approved on blockchain
         const allMilestonesApproved = escrowDetails.milestones?.every((m: any) => m.approved === true) || false;
-        console.log('All milestones approved on blockchain:', allMilestonesApproved);
 
         if (allMilestonesApproved && project.status !== 'completed') {
-            console.log('All milestones approved but project status is not completed. Updating project status to completed.');
             await req.prisma.project.update({
                 where: { id: project.id },
                 data: { status: 'completed' }
             });
-            console.log('Project status updated to completed');
         }
 
         const currentStaking = project.stakings[0];
-        console.log('Current staking:', currentStaking ? `Staking ID: ${currentStaking.id}` : 'No staking found');
         const milestones = project.milestones;
-        console.log('Milestones count:', milestones.length);
 
         // Check if milestone payment amounts are 0 and fix them
         const totalMilestonePayments = milestones.reduce((sum, m) => sum + parseFloat(m.paymentAmount.toString()), 0);
-        console.log('Total milestone payments:', totalMilestonePayments);
-        console.log('Job total payment:', job.totalPayment);
 
         if (totalMilestonePayments === 0 && parseFloat(job.totalPayment.toString()) > 0) {
-            console.log('Milestone payments are 0 but job has payment amount. Fixing milestone payments...');
-
-            // Calculate equal distribution of payments across milestones
             const jobTotalPayment = parseFloat(job.totalPayment.toString());
             const paymentPerMilestone = jobTotalPayment / milestones.length;
 
-            // Update milestone payment amounts
             for (let i = 0; i < milestones.length; i++) {
                 const milestone = milestones[i];
                 await req.prisma.milestone.update({
                     where: { id: milestone.id },
                     data: { paymentAmount: paymentPerMilestone }
                 });
-                console.log(`Updated milestone ${i + 1} payment amount to ${paymentPerMilestone}`);
             }
-
-            console.log('Milestone payment amounts fixed');
         }
+
+        // ========== LOG INITIAL DATABASE STATE ==========
+        console.log('📊 INITIAL DATABASE STATE:');
+        console.log('-'.repeat(80));
+        console.log(`Staking:`);
+        console.log(`  Total Staked: ${currentStaking?.totalStaked ? parseFloat(currentStaking.totalStaked.toString()) : 0} SOL`);
+        console.log(`  Total Released: ${currentStaking?.totalReleased ? parseFloat(currentStaking.totalReleased.toString()) : 0} SOL`);
+        console.log(`\nMilestones (${milestones.length}):`);
+        milestones.forEach((m, i) => {
+            console.log(`  ${i + 1}. Amount: ${parseFloat(m.paymentAmount.toString())} SOL | Status: ${m.status} | Released: ${m.paymentReleased}`);
+        });
+
+        // ========== LOG BLOCKCHAIN STATE ==========
+        console.log('\n⛓️  BLOCKCHAIN STATE:');
+        console.log('-'.repeat(80));
+        const blockchainTotalStaked = escrowDetails.milestones?.reduce((sum: number, m: any) => sum + m.amount, 0) || 0;
+        const blockchainTotalReleased = escrowDetails.milestones?.reduce((sum: number, m: any) =>
+            m.claimed ? sum + m.amount : sum, 0) || 0;
+        console.log(`Escrow PDA: ${escrowDetails.escrowPDA}`);
+        console.log(`Total Staked: ${blockchainTotalStaked} SOL`);
+        console.log(`Total Released: ${blockchainTotalReleased} SOL`);
+        console.log(`\nMilestones (${escrowDetails.milestones?.length || 0}):`);
+        escrowDetails.milestones?.forEach((m: any, i: number) => {
+            console.log(`  ${i + 1}. Amount: ${m.amount} SOL | Approved: ${m.approved} | Claimed: ${m.claimed}`);
+        });
 
         // Compare blockchain data with database
         let needsUpdate = false;
-        console.log('Initialized needsUpdate:', needsUpdate);
         const updates: any = {};
-        console.log('Initialized updates object:', updates);
+        const milestoneUpdates: any[] = [];
+        const discrepancies: string[] = [];
 
-        // Check total staked amount
-        const blockchainTotalStaked = escrowDetails.milestones?.reduce((sum: number, m: any) => sum + m.amount, 0) || 0;
-        console.log('Blockchain total staked:', blockchainTotalStaked);
+        // Check total staked amount (only flag if difference is >= 4%)
         const dbTotalStaked = currentStaking?.totalStaked ? parseFloat(currentStaking.totalStaked.toString()) : 0;
-        console.log('Database total staked:', dbTotalStaked);
 
-        if (Math.abs(blockchainTotalStaked - dbTotalStaked) > 0.001) {
-            console.log(`Total staked mismatch: DB=${dbTotalStaked}, Blockchain=${blockchainTotalStaked}`);
+        const stakedDifference = Math.abs(blockchainTotalStaked - dbTotalStaked);
+        const stakedPercentageDiff = dbTotalStaked > 0 ? (stakedDifference / dbTotalStaked) * 100 : (blockchainTotalStaked > 0 ? 100 : 0);
+
+        if (stakedPercentageDiff >= 4) {
             needsUpdate = true;
-            console.log('Set needsUpdate to true');
             updates.totalStaked = blockchainTotalStaked;
-            console.log('Added totalStaked to updates:', blockchainTotalStaked);
+            discrepancies.push(`Total Staked: DB=${dbTotalStaked} SOL → Blockchain=${blockchainTotalStaked} SOL (${stakedPercentageDiff.toFixed(2)}% diff)`);
         }
 
         // Check milestone statuses
-        const milestoneUpdates: any[] = [];
-        console.log('Initialized milestoneUpdates array');
         if (escrowDetails.milestones) {
-            console.log('Processing blockchain milestones, count:', escrowDetails.milestones.length);
             escrowDetails.milestones.forEach((blockchainMilestone: any, index: number) => {
-                console.log(`Processing milestone ${index + 1}`);
                 const dbMilestone = milestones[index];
-                console.log(`DB milestone ${index + 1}:`, dbMilestone ? `ID: ${dbMilestone.id}` : 'Not found');
                 if (dbMilestone) {
                     const milestoneUpdate: any = {};
-                    console.log(`Initialized milestoneUpdate for milestone ${index + 1}`);
                     let milestoneNeedsUpdate = false;
-                    console.log(`Initialized milestoneNeedsUpdate for milestone ${index + 1}:`, milestoneNeedsUpdate);
 
-                    // Check payment amount
+                    // Check payment amount (only flag if difference is >= 4%)
                     const dbPaymentAmount = parseFloat(dbMilestone.paymentAmount.toString());
-                    console.log(`Milestone ${index + 1} DB payment amount:`, dbPaymentAmount);
-                    console.log(`Milestone ${index + 1} blockchain amount:`, blockchainMilestone.amount);
-                    if (Math.abs(blockchainMilestone.amount - dbPaymentAmount) > 0.001) {
-                        console.log(`Milestone ${index + 1} amount mismatch: DB=${dbMilestone.paymentAmount}, Blockchain=${blockchainMilestone.amount}`);
+                    const paymentDifference = Math.abs(blockchainMilestone.amount - dbPaymentAmount);
+                    const paymentPercentageDiff = dbPaymentAmount > 0 ? (paymentDifference / dbPaymentAmount) * 100 : (blockchainMilestone.amount > 0 ? 100 : 0);
+                    
+                    if (paymentPercentageDiff >= 4) {
                         milestoneUpdate.paymentAmount = blockchainMilestone.amount;
-                        console.log(`Added paymentAmount to milestoneUpdate for milestone ${index + 1}`);
                         milestoneNeedsUpdate = true;
-                        console.log(`Set milestoneNeedsUpdate to true for milestone ${index + 1}`);
+                        discrepancies.push(`Milestone ${index + 1} Amount: DB=${dbPaymentAmount} SOL → Blockchain=${blockchainMilestone.amount} SOL (${paymentPercentageDiff.toFixed(2)}% diff)`);
                     }
 
                     // Check if milestone is claimed on blockchain but not in DB
-                    console.log(`Milestone ${index + 1} blockchain claimed:`, blockchainMilestone.claimed);
-                    console.log(`Milestone ${index + 1} DB paymentReleased:`, dbMilestone.paymentReleased);
                     if (blockchainMilestone.claimed && !dbMilestone.paymentReleased) {
-                        console.log(`Milestone ${index + 1} claimed on blockchain but not in DB`);
                         milestoneUpdate.paymentReleased = true;
-                        console.log(`Set paymentReleased to true for milestone ${index + 1}`);
                         milestoneUpdate.status = 'completed';
-                        console.log(`Set status to completed for milestone ${index + 1}`);
                         milestoneNeedsUpdate = true;
-                        console.log(`Set milestoneNeedsUpdate to true for milestone ${index + 1}`);
                         needsUpdate = true;
-                        console.log('Set needsUpdate to true');
+                        discrepancies.push(`Milestone ${index + 1} Status: DB=Released:${dbMilestone.paymentReleased} → Blockchain=Claimed:${blockchainMilestone.claimed}`);
                     }
 
                     // Check if milestone is approved on blockchain but not in DB
-                    console.log(`Milestone ${index + 1} blockchain approved:`, blockchainMilestone.approved);
-                    console.log(`Milestone ${index + 1} DB status:`, dbMilestone.status);
                     if (blockchainMilestone.approved && dbMilestone.status !== 'approved' && !dbMilestone.paymentReleased) {
-                        console.log(`Milestone ${index + 1} approved on blockchain but not in DB`);
                         milestoneUpdate.status = 'approved';
-                        console.log(`Set status to approved for milestone ${index + 1}`);
                         milestoneNeedsUpdate = true;
-                        console.log(`Set milestoneNeedsUpdate to true for milestone ${index + 1}`);
                         needsUpdate = true;
-                        console.log('Set needsUpdate to true');
+                        discrepancies.push(`Milestone ${index + 1} Status: DB=${dbMilestone.status} → Blockchain=Approved`);
                     }
 
                     if (milestoneNeedsUpdate) {
-                        console.log(`Milestone ${index + 1} needs update, adding to milestoneUpdates`);
                         milestoneUpdates.push({
                             id: dbMilestone.id,
                             updates: milestoneUpdate
                         });
-                        console.log(`Added milestone ${index + 1} to milestoneUpdates array`);
                     }
                 }
             });
         }
 
-        // Calculate total released from blockchain
-        const blockchainTotalReleased = escrowDetails.milestones?.reduce((sum: number, m: any) =>
-            m.claimed ? sum + m.amount : sum, 0) || 0;
-        console.log('Blockchain total released:', blockchainTotalReleased);
+        // Calculate total released from blockchain (only flag if difference is >= 4%)
         const dbTotalReleased = currentStaking?.totalReleased ? parseFloat(currentStaking.totalReleased.toString()) : 0;
-        console.log('Database total released:', dbTotalReleased);
 
-        if (Math.abs(blockchainTotalReleased - dbTotalReleased) > 0.001) {
-            console.log(`Total released mismatch: DB=${dbTotalReleased}, Blockchain=${blockchainTotalReleased}`);
+        const releasedDifference = Math.abs(blockchainTotalReleased - dbTotalReleased);
+        const releasedPercentageDiff = dbTotalReleased > 0 ? (releasedDifference / dbTotalReleased) * 100 : (blockchainTotalReleased > 0 ? 100 : 0);
+
+        if (releasedPercentageDiff >= 4) {
             needsUpdate = true;
-            console.log('Set needsUpdate to true');
             updates.totalReleased = blockchainTotalReleased;
-            console.log('Added totalReleased to updates:', blockchainTotalReleased);
+            discrepancies.push(`Total Released: DB=${dbTotalReleased} SOL → Blockchain=${blockchainTotalReleased} SOL (${releasedPercentageDiff.toFixed(2)}% diff)`);
         }
 
+        // ========== LOG DISCREPANCIES & UPDATES ==========
         if (!needsUpdate && milestoneUpdates.length === 0) {
-            console.log('Database is already in sync with blockchain');
+            console.log('\n✅ DATABASE IS IN SYNC WITH BLOCKCHAIN');
+            console.log('No updates needed.\n');
+            console.log('='.repeat(80) + '\n');
             return res.json({
                 status: 'synced',
                 message: 'Database is already synchronized with blockchain',
@@ -724,37 +701,53 @@ router.post('/:id/sync-blockchain', authenticateToken, async (req, res) => {
             });
         }
 
-        console.log('Updating database with blockchain data...');
-        console.log('Staking updates:', updates);
-        console.log('Milestone updates:', milestoneUpdates);
+        console.log('\n⚠️  DISCREPANCIES FOUND:');
+        console.log('-'.repeat(80));
+        if (discrepancies.length > 0) {
+            discrepancies.forEach((disc, i) => {
+                console.log(`${i + 1}. ${disc}`);
+            });
+        }
+
+        console.log('\n🔧 UPDATES TO BE APPLIED:');
+        console.log('-'.repeat(80));
+        if (Object.keys(updates).length > 0) {
+            console.log('Staking Updates:');
+            Object.entries(updates).forEach(([key, value]) => {
+                console.log(`  ${key}: ${value}`);
+            });
+        }
+        if (milestoneUpdates.length > 0) {
+            console.log(`\nMilestone Updates (${milestoneUpdates.length}):`);
+            milestoneUpdates.forEach((mu, i) => {
+                console.log(`  ${i + 1}. Milestone ID: ${mu.id}`);
+                Object.entries(mu.updates).forEach(([key, value]) => {
+                    console.log(`     ${key}: ${value}`);
+                });
+            });
+        }
 
         // Perform updates in a transaction
         await req.prisma.$transaction(async (tx) => {
-            console.log('Transaction started');
             // Update staking if needed
             if (Object.keys(updates).length > 0) {
-                console.log('Updating staking with:', updates);
                 await tx.staking.update({
                     where: { id: currentStaking.id },
                     data: updates
                 });
-                console.log('Staking updated successfully');
             }
 
             // Update milestones if needed
             for (const milestoneUpdate of milestoneUpdates) {
-                console.log('Updating milestone:', milestoneUpdate.id, 'with:', milestoneUpdate.updates);
                 await tx.milestone.update({
                     where: { id: milestoneUpdate.id },
                     data: milestoneUpdate.updates
                 });
-                console.log('Milestone updated successfully:', milestoneUpdate.id);
             }
-            console.log('Transaction completed');
         });
 
-        console.log('Database updated successfully');
-        console.log(`=== BLOCKCHAIN SYNC END (UPDATED) ===`);
+        console.log('\n✅ DATABASE UPDATED SUCCESSFULLY');
+        console.log('='.repeat(80) + '\n');
 
         res.json({
             status: 'outdated',
@@ -765,12 +758,11 @@ router.post('/:id/sync-blockchain', authenticateToken, async (req, res) => {
             },
             blockchainData: escrowDetails
         });
-        console.log('Response sent to client');
 
     } catch (error) {
-        console.error('Blockchain sync error:', error);
+        console.error('\n❌ BLOCKCHAIN SYNC ERROR:', error);
+        console.log('='.repeat(80) + '\n');
         res.status(500).json({ error: 'Failed to sync with blockchain' });
-        console.log('Error response sent to client');
     }
 });
 

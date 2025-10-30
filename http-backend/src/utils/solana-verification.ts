@@ -226,7 +226,7 @@ export async function getEscrowDetails(
                 recruiterWallet: escrowData.recruiter.toBase58(),
                 freelancerWallet: escrowData.freelancer.toBase58(),
                 milestones: milestoneAmounts.map((amount: any, index: number) => ({
-                    amount: (typeof amount.toNumber === 'function' ? amount.toNumber() : amount) / LAMPORTS_PER_SOL,
+                    amount: amount, // Already converted to SOL by lamportsToSol() on line 214
                     approved: escrowData.milestonesApproved[index],
                     claimed: escrowData.milestonesClaimed[index]
                 }))

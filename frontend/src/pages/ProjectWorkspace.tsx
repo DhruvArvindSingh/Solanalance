@@ -5,6 +5,7 @@ import { apiClient } from "@/integrations/apiClient/client";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL, SystemProgram, Transaction } from "@solana/web3.js";
 import { claimMilestone } from "@/lib/escrow-operations";
+import { getEscrowAccount } from "@/lib/solana";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,7 @@ import {
     ExternalLink,
     Edit,
     RefreshCw,
+    Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -50,6 +52,7 @@ interface Milestone {
     reviewer_comments: string | null;
     payment_released: boolean;
     payment_amount: number;
+    transaction_signature: string | null;
     stage: {
         name: string;
         description: string | null;
@@ -500,63 +503,68 @@ export default function ProjectWorkspace() {
         setIsClaimingPayment(prev => ({ ...prev, [milestone.id]: true }));
 
         try {
-            // Get recruiter wallet address
-            console.log("Fetching recruiter profile for ID:", project.recruiter_id);
-            const { data: recruiterProfile, error: recruiterError } = await apiClient.profile.getById(project.recruiter_id);
+            // Get recruiter wallet address from project data (no need to fetch profile)
+            const recruiterWalletAddress = project.job.recruiter_wallet;
 
-            if (recruiterError) {
-                console.error("Recruiter profile fetch error:", recruiterError);
-                throw new Error(recruiterError);
+            if (!recruiterWalletAddress) {
+                console.error("Recruiter wallet address missing from project data");
+                throw new Error("Recruiter wallet not found in project data");
             }
 
-            console.log("Recruiter profile:", recruiterProfile);
+            console.log("Recruiter wallet from project:", recruiterWalletAddress);
 
-            if (!recruiterProfile?.wallet_address) {
-                console.error("Recruiter wallet address missing");
-                throw new Error("Recruiter wallet not found");
+            // Fetch escrow data from blockchain to get the actual freelancer wallet and milestone status
+            console.log("Fetching escrow data from blockchain...");
+            const escrowAccount = await getEscrowAccount(recruiterWalletAddress, project.job_id);
+
+            if (!escrowAccount) {
+                console.error("Escrow account not found on blockchain");
+                throw new Error("Escrow account not found. Funds may not have been staked yet.");
             }
 
-            console.log("Recruiter wallet:", recruiterProfile.wallet_address);
+            console.log("Escrow account data:", escrowAccount);
 
-            // Get freelancer wallet address to verify
-            console.log("Fetching freelancer profile for ID:", project.freelancer_id);
-            const { data: freelancerProfile, error: freelancerError } = await apiClient.profile.getById(project.freelancer_id);
+            // Get milestone index (0-based)
+            const milestoneIndex = milestone.stage_number - 1;
 
-            if (freelancerError) {
-                console.error("Freelancer profile fetch error:", freelancerError);
-                throw new Error(freelancerError);
+            // Check if milestone is approved on blockchain
+            const isApproved = escrowAccount.milestonesApproved[milestoneIndex];
+            const isClaimed = escrowAccount.milestonesClaimed[milestoneIndex];
+
+            console.log(`Milestone ${milestone.stage_number} blockchain status:`, {
+                approved: isApproved,
+                claimed: isClaimed
+            });
+
+            if (!isApproved) {
+                console.error("Milestone not approved on blockchain");
+                throw new Error("This milestone has not been approved yet. The recruiter must approve it first.");
             }
 
-            console.log("Freelancer profile:", freelancerProfile);
-
-            if (!freelancerProfile?.wallet_address) {
-                console.error("Freelancer wallet address missing");
-                throw new Error("Freelancer wallet not found");
+            if (isClaimed) {
+                console.error("Milestone already claimed on blockchain");
+                throw new Error("This milestone has already been claimed.");
             }
 
-            console.log("Freelancer wallet:", freelancerProfile.wallet_address);
-
-            // Verify the connected wallet matches the freelancer wallet
+            // Verify the connected wallet matches the freelancer wallet from escrow
             const connectedWallet = publicKey.toBase58();
-            const freelancerWallet = freelancerProfile.wallet_address;
+            const escrowFreelancerWallet = escrowAccount.freelancer;
 
             console.log("Wallet verification:", {
                 connected: connectedWallet,
-                expected: freelancerWallet,
-                match: connectedWallet === freelancerWallet
+                escrowFreelancer: escrowFreelancerWallet,
+                match: connectedWallet === escrowFreelancerWallet
             });
 
-            if (connectedWallet !== freelancerWallet) {
-                console.error("Wallet mismatch!");
-                throw new Error("Connected wallet does not match the freelancer wallet for this project");
+            if (connectedWallet !== escrowFreelancerWallet) {
+                console.error("Wallet mismatch with escrow!");
+                throw new Error(`Connected wallet does not match the freelancer wallet in the escrow. Expected: ${escrowFreelancerWallet}`);
             }
 
             // Call smart contract to claim milestone
-            const milestoneIndex = milestone.stage_number - 1; // Convert to 0-indexed
-
             console.log("Calling claimMilestone with params:", {
                 jobId: project.job_id,
-                recruiterWallet: recruiterProfile.wallet_address,
+                recruiterWallet: recruiterWalletAddress,
                 milestoneIndex: milestoneIndex,
                 freelancerWallet: connectedWallet
             });
@@ -565,7 +573,7 @@ export default function ProjectWorkspace() {
             const result = await claimMilestone(
                 wallet,
                 project.job_id,
-                recruiterProfile.wallet_address,
+                recruiterWalletAddress,
                 milestoneIndex
             );
 
@@ -1310,17 +1318,57 @@ export default function ProjectWorkspace() {
 
                                     {/* Payment Released Display */}
                                     {milestone.payment_released && (
-                                        <Alert className="border-success/30 bg-success/10">
-                                            <CheckCircle className="h-4 w-4 text-success" />
-                                            <AlertDescription>
-                                                Payment of {milestone.payment_amount.toFixed(2)} SOL
-                                                has been released
-                                                {milestone.reviewed_at &&
-                                                    ` ${formatDistanceToNow(
-                                                        new Date(milestone.reviewed_at)
-                                                    )} ago`}
-                                            </AlertDescription>
-                                        </Alert>
+                                        <div className="space-y-3">
+                                            <Alert className="border-success/30 bg-success/10">
+                                                <CheckCircle className="h-4 w-4 text-success" />
+                                                <AlertDescription>
+                                                    Payment of {milestone.payment_amount.toFixed(2)} SOL
+                                                    has been released
+                                                    {milestone.reviewed_at &&
+                                                        ` ${formatDistanceToNow(
+                                                            new Date(milestone.reviewed_at)
+                                                        )} ago`}
+                                                </AlertDescription>
+                                            </Alert>
+                                            
+                                            {milestone.transaction_signature && (
+                                                <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                                                    <label className="text-sm font-medium text-muted-foreground">
+                                                        Transaction Signature:
+                                                    </label>
+                                                    <div className="flex items-center gap-2">
+                                                        <code className="flex-1 text-xs font-mono bg-background px-3 py-2 rounded border break-all">
+                                                            {milestone.transaction_signature}
+                                                        </code>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(milestone.transaction_signature!);
+                                                                toast.success("Transaction signature copied!");
+                                                            }}
+                                                            className="h-8 w-8 p-0 flex-shrink-0"
+                                                        >
+                                                            <Copy className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                window.open(
+                                                                    `https://explorer.solana.com/tx/${milestone.transaction_signature}?cluster=devnet`,
+                                                                    '_blank'
+                                                                );
+                                                            }}
+                                                            className="gap-2 flex-shrink-0"
+                                                        >
+                                                            <ExternalLink className="w-4 h-4" />
+                                                            Explorer
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </CardContent>
                             </Card>
