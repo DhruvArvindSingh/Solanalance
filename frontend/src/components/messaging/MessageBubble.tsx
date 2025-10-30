@@ -2,6 +2,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Message } from '@/stores/messagingStore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
+import { FileMessage } from './FileMessage';
 
 interface MessageBubbleProps {
     message: Message;
@@ -30,14 +31,26 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                         {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
                     </span>
                 </div>
-                <div
-                    className={`px-4 py-3 shadow-sm ${isOwnMessage
-                        ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-2xl rounded-br-md'
-                        : 'bg-muted/80 border border-border/30 rounded-2xl rounded-bl-md hover:bg-muted/90'
-                        } transition-colors duration-200`}
-                >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
-                </div>
+                {/* File Message */}
+                {message.messageType === 'file' && message.fileUrl ? (
+                    <FileMessage
+                        fileUrl={message.fileUrl}
+                        fileName={message.fileName || 'Unknown file'}
+                        fileSize={message.fileSize || 0}
+                        mimetype={message.fileMimetype || 'application/octet-stream'}
+                        isOwnMessage={isOwnMessage}
+                    />
+                ) : (
+                    /* Text Message */
+                    <div
+                        className={`px-4 py-3 shadow-sm ${isOwnMessage
+                            ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-2xl rounded-br-md'
+                            : 'bg-muted/80 border border-border/30 rounded-2xl rounded-bl-md hover:bg-muted/90'
+                            } transition-colors duration-200`}
+                    >
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
+                    </div>
+                )}
             </div>
         </div>
     );

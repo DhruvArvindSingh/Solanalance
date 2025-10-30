@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Save, Plus, X, Wallet, CheckCircle, AlertCircle, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Plus, X, Wallet, CheckCircle, AlertCircle, Upload, Loader2, Github, Linkedin, Mail, Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
@@ -27,8 +27,9 @@ export default function EditProfile() {
     const [newSkill, setNewSkill] = useState("");
     const [avatarUrl, setAvatarUrl] = useState("");
     const [walletAddress, setWalletAddress] = useState("");
-    const [manualWalletAddress, setManualWalletAddress] = useState("");
-    const [useManualWallet, setUseManualWallet] = useState(false);
+    const [githubUrl, setGithubUrl] = useState("");
+    const [linkedinUrl, setLinkedinUrl] = useState("");
+    const [portfolioEmail, setPortfolioEmail] = useState("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
@@ -70,9 +71,10 @@ export default function EditProfile() {
                 setHourlyRate(data.hourly_rate || 0);
                 setSkills(data.skills || []);
                 setAvatarUrl(data.avatar_url || "");
-                const walletAddr = data.wallet_address || "";
-                setWalletAddress(walletAddr);
-                setManualWalletAddress(walletAddr);
+                setWalletAddress(data.wallet_address || "");
+                setGithubUrl(data.github_url || "");
+                setLinkedinUrl(data.linkedin_url || "");
+                setPortfolioEmail(data.portfolio_email || "");
             }
         } catch (error: any) {
             console.error("Error fetching profile:", error);
@@ -170,20 +172,8 @@ export default function EditProfile() {
         setSaving(true);
 
         try {
-            // Determine final wallet address based on method used
-            let finalWalletAddress = null;
-            if (useManualWallet) {
-                // Validate manual wallet address
-                if (manualWalletAddress.trim()) {
-                    if (!/^([1-9A-HJ-NP-Za-km-z]{32,44})$/.test(manualWalletAddress.trim())) {
-                        toast.error("Please enter a valid Solana wallet address");
-                        return;
-                    }
-                    finalWalletAddress = manualWalletAddress.trim();
-                }
-            } else if (walletAddress) {
-                finalWalletAddress = walletAddress;
-            }
+            // Use connected wallet address
+            const finalWalletAddress = walletAddress || null;
 
             const { data, error } = await apiClient.profile.update({
                 fullName,
@@ -193,6 +183,9 @@ export default function EditProfile() {
                 skills: skills,
                 avatarUrl: avatarUrl || null,
                 walletAddress: finalWalletAddress,
+                githubUrl: githubUrl || null,
+                linkedinUrl: linkedinUrl || null,
+                portfolioEmail: portfolioEmail || null,
             });
 
             if (error) throw new Error(error);
@@ -309,32 +302,6 @@ export default function EditProfile() {
                                         </p>
                                     </div>
 
-                                    {/* Or Section */}
-                                    <div className="relative">
-                                        <div className="absolute inset-0 flex items-center">
-                                            <div className="w-full border-t border-muted"></div>
-                                        </div>
-                                        <div className="relative flex justify-center text-xs uppercase">
-                                            <span className="px-2 bg-background text-muted-foreground">Or</span>
-                                        </div>
-                                    </div>
-
-                                    {/* URL Input Section */}
-                                    <div>
-                                        <Label htmlFor="avatar" className="text-sm font-medium mb-2 block">
-                                            Avatar URL
-                                        </Label>
-                                        <Input
-                                            id="avatar"
-                                            type="url"
-                                            placeholder="https://example.com/avatar.jpg"
-                                            value={avatarUrl}
-                                            onChange={(e) => setAvatarUrl(e.target.value)}
-                                        />
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            Or provide a URL to your profile picture
-                                        </p>
-                                    </div>
                                 </div>
                             </div>
                         </CardContent>
@@ -423,107 +390,56 @@ export default function EditProfile() {
                                 <div className="flex gap-2 mb-4">
                                     <Button
                                         type="button"
-                                        variant={!useManualWallet ? "default" : "outline"}
                                         size="sm"
-                                        onClick={() => setUseManualWallet(false)}
-                                        className={!useManualWallet ? "bg-gradient-solana" : ""}
+                                        onClick={() => setVisible(true)}
+                                        className="bg-gradient-solana"
                                     >
                                         <Wallet className="w-4 h-4 mr-2" />
                                         Connect Wallet
                                     </Button>
-                                    <Button
-                                        type="button"
-                                        variant={useManualWallet ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => setUseManualWallet(true)}
-                                        className={useManualWallet ? "bg-gradient-solana" : ""}
-                                    >
-                                        <CheckCircle className="w-4 h-4 mr-2" />
-                                        Enter Address
-                                    </Button>
                                 </div>
 
                                 <div className="p-4 border rounded-lg bg-muted/20">
-                                    {useManualWallet ? (
-                                        /* Manual Wallet Address Entry */
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-2 text-blue-600">
+                                    {/* Wallet Connection */}
+                                    {walletAddress ? (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2 text-green-600">
                                                 <CheckCircle className="w-4 h-4" />
-                                                <span className="text-sm font-medium">Enter Wallet Address</span>
+                                                <span className="text-sm font-medium">Wallet Connected</span>
                                             </div>
-                                            <p className="text-xs text-muted-foreground">
-                                                Enter your Solana wallet address manually. Changes will be saved when you update your profile.
-                                            </p>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="edit-manual-wallet" className="text-xs">Wallet Address</Label>
-                                                <Input
-                                                    id="edit-manual-wallet"
-                                                    type="text"
-                                                    placeholder="Enter your Solana wallet address (32-44 characters)"
-                                                    value={manualWalletAddress}
-                                                    onChange={(e) => setManualWalletAddress(e.target.value)}
-                                                    className="font-mono text-sm"
-                                                    maxLength={44}
-                                                />
-                                                {manualWalletAddress && (
-                                                    <div className="flex items-center gap-2">
-                                                        {/^([1-9A-HJ-NP-Za-km-z]{32,44})$/.test(manualWalletAddress) ? (
-                                                            <CheckCircle className="w-3 h-3 text-green-600" />
-                                                        ) : (
-                                                            <AlertCircle className="w-3 h-3 text-red-600" />
-                                                        )}
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {/^([1-9A-HJ-NP-Za-km-z]{32,44})$/.test(manualWalletAddress)
-                                                                ? "Valid Solana address"
-                                                                : "Invalid Solana address format"
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                )}
+                                            <div className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded break-all">
+                                                {walletAddress}
                                             </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setVisible(true)}
+                                                className="text-xs"
+                                            >
+                                                Change Wallet
+                                            </Button>
                                         </div>
                                     ) : (
-                                        /* Wallet Connection */
-                                        walletAddress ? (
-                                            <div className="space-y-2">
-                                                <div className="flex items-center gap-2 text-green-600">
-                                                    <CheckCircle className="w-4 h-4" />
-                                                    <span className="text-sm font-medium">Wallet Connected</span>
-                                                </div>
-                                                <div className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded break-all">
-                                                    {walletAddress}
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => setVisible(true)}
-                                                    className="text-xs"
-                                                >
-                                                    Change Wallet
-                                                </Button>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2 text-orange-600">
+                                                <AlertCircle className="w-4 h-4" />
+                                                <span className="text-sm font-medium">No Wallet Connected</span>
                                             </div>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                <div className="flex items-center gap-2 text-orange-600">
-                                                    <AlertCircle className="w-4 h-4" />
-                                                    <span className="text-sm font-medium">No Wallet Connected</span>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Connect your Solana wallet for secure transactions and staking.
-                                                </p>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => setVisible(true)}
-                                                    className="bg-gradient-solana text-white hover:bg-gradient-solana/90"
-                                                >
-                                                    <Wallet className="w-4 h-4 mr-2" />
-                                                    Select Wallet
-                                                </Button>
-                                            </div>
-                                        )
+                                            <p className="text-xs text-muted-foreground">
+                                                Connect your Solana wallet for secure transactions and staking.
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setVisible(true)}
+                                                className="bg-gradient-solana text-white hover:bg-gradient-solana/90"
+                                            >
+                                                <Wallet className="w-4 h-4 mr-2" />
+                                                Select Wallet
+                                            </Button>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -584,6 +500,137 @@ export default function EditProfile() {
                                     Please add at least 3 skills
                                 </p>
                             )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Social Media Links */}
+                    <Card className="glass border-white/10">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <LinkIcon className="w-5 h-5" />
+                                Social Media & Contact
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                                Help others connect with you by adding your professional profiles
+                            </p>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-3">
+                                <Label htmlFor="githubUrl" className="flex items-center gap-2 text-base">
+                                    <div className="p-1 rounded-md bg-gray-900 text-white">
+                                        <Github className="w-4 h-4" />
+                                    </div>
+                                    GitHub Profile
+                                </Label>
+                                <Input
+                                    id="githubUrl"
+                                    type="url"
+                                    placeholder="https://github.com/yourusername"
+                                    value={githubUrl}
+                                    onChange={(e) => setGithubUrl(e.target.value)}
+                                    className="pl-4"
+                                />
+                                {githubUrl && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                        {/^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9_-]+\/?$/.test(githubUrl) ? (
+                                            <CheckCircle className="w-3 h-3 text-green-600" />
+                                        ) : (
+                                            <AlertCircle className="w-3 h-3 text-red-600" />
+                                        )}
+                                        <span className={
+                                            /^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9_-]+\/?$/.test(githubUrl)
+                                                ? "text-green-600"
+                                                : "text-red-600"
+                                        }>
+                                            {/^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9_-]+\/?$/.test(githubUrl)
+                                                ? "Valid GitHub URL"
+                                                : "Please use format: https://github.com/username"
+                                            }
+                                        </span>
+                                    </div>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                    Showcase your code repositories and open source contributions
+                                </p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <Label htmlFor="linkedinUrl" className="flex items-center gap-2 text-base">
+                                    <div className="p-1 rounded-md bg-blue-600 text-white">
+                                        <Linkedin className="w-4 h-4" />
+                                    </div>
+                                    LinkedIn Profile
+                                </Label>
+                                <Input
+                                    id="linkedinUrl"
+                                    type="url"
+                                    placeholder="https://linkedin.com/in/yourusername"
+                                    value={linkedinUrl}
+                                    onChange={(e) => setLinkedinUrl(e.target.value)}
+                                    className="pl-4"
+                                />
+                                {linkedinUrl && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                        {/^https?:\/\/(www\.)?linkedin\.com\/(in|pub)\/[a-zA-Z0-9_-]+\/?$/.test(linkedinUrl) ? (
+                                            <CheckCircle className="w-3 h-3 text-green-600" />
+                                        ) : (
+                                            <AlertCircle className="w-3 h-3 text-red-600" />
+                                        )}
+                                        <span className={
+                                            /^https?:\/\/(www\.)?linkedin\.com\/(in|pub)\/[a-zA-Z0-9_-]+\/?$/.test(linkedinUrl)
+                                                ? "text-green-600"
+                                                : "text-red-600"
+                                        }>
+                                            {/^https?:\/\/(www\.)?linkedin\.com\/(in|pub)\/[a-zA-Z0-9_-]+\/?$/.test(linkedinUrl)
+                                                ? "Valid LinkedIn URL"
+                                                : "Please use format: https://linkedin.com/in/username"
+                                            }
+                                        </span>
+                                    </div>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                    Connect with your professional network and career history
+                                </p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <Label htmlFor="portfolioEmail" className="flex items-center gap-2 text-base">
+                                    <div className="p-1 rounded-md bg-emerald-600 text-white">
+                                        <Mail className="w-4 h-4" />
+                                    </div>
+                                    Portfolio/Contact Email
+                                </Label>
+                                <Input
+                                    id="portfolioEmail"
+                                    type="email"
+                                    placeholder="contact@yourportfolio.com"
+                                    value={portfolioEmail}
+                                    onChange={(e) => setPortfolioEmail(e.target.value)}
+                                    className="pl-4"
+                                />
+                                {portfolioEmail && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                        {/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(portfolioEmail) ? (
+                                            <CheckCircle className="w-3 h-3 text-green-600" />
+                                        ) : (
+                                            <AlertCircle className="w-3 h-3 text-red-600" />
+                                        )}
+                                        <span className={
+                                            /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(portfolioEmail)
+                                                ? "text-green-600"
+                                                : "text-red-600"
+                                        }>
+                                            {/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(portfolioEmail)
+                                                ? "Valid email address"
+                                                : "Please enter a valid email address"
+                                            }
+                                        </span>
+                                    </div>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                    Alternative email for portfolio inquiries and business contacts
+                                </p>
+                            </div>
                         </CardContent>
                     </Card>
 

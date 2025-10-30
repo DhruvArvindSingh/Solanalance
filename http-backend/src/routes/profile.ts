@@ -58,6 +58,12 @@ router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(id)) {
+            return res.status(400).json({ error: 'Invalid user ID format. Please provide a valid UUID.' });
+        }
+
         const profile = await req.prisma.profile.findUnique({
             where: { id },
             include: {
@@ -141,6 +147,9 @@ router.get('/:id', async (req, res) => {
             skills: profile.skills,
             hourly_rate: profile.hourlyRate,
             company_name: profile.companyName,
+            github_url: profile.githubUrl,
+            linkedin_url: profile.linkedinUrl,
+            portfolio_email: profile.portfolioEmail,
             created_at: profile.createdAt,
             role: profile.userRoles[0]?.role || null,
             trust_points: profile.trustPoints[0] || null,
@@ -158,7 +167,29 @@ router.get('/:id', async (req, res) => {
 // Update profile
 router.put('/update', authenticateToken, async (req, res) => {
     try {
-        const { fullName, bio, companyName, hourlyRate, skills, avatarUrl, walletAddress } = req.body;
+        const { fullName, bio, companyName, hourlyRate, skills, avatarUrl, walletAddress, githubUrl, linkedinUrl, portfolioEmail } = req.body;
+
+        // Validate social media URLs if provided
+        if (githubUrl && githubUrl.trim()) {
+            const githubPattern = /^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9_-]+\/?$/;
+            if (!githubPattern.test(githubUrl.trim())) {
+                return res.status(400).json({ error: 'Invalid GitHub URL format. Please use: https://github.com/username' });
+            }
+        }
+
+        if (linkedinUrl && linkedinUrl.trim()) {
+            const linkedinPattern = /^https?:\/\/(www\.)?linkedin\.com\/(in|pub)\/[a-zA-Z0-9_-]+\/?$/;
+            if (!linkedinPattern.test(linkedinUrl.trim())) {
+                return res.status(400).json({ error: 'Invalid LinkedIn URL format. Please use: https://linkedin.com/in/username' });
+            }
+        }
+
+        if (portfolioEmail && portfolioEmail.trim()) {
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailPattern.test(portfolioEmail.trim())) {
+                return res.status(400).json({ error: 'Invalid email format' });
+            }
+        }
 
         // Handle wallet address update if provided
         if (walletAddress !== undefined) {
@@ -210,7 +241,10 @@ router.put('/update', authenticateToken, async (req, res) => {
                 companyName,
                 hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
                 skills: skills || [],
-                avatarUrl
+                avatarUrl,
+                githubUrl: githubUrl?.trim() || null,
+                linkedinUrl: linkedinUrl?.trim() || null,
+                portfolioEmail: portfolioEmail?.trim() || null
             }
         });
 
@@ -230,6 +264,9 @@ router.put('/update', authenticateToken, async (req, res) => {
                 hourly_rate: updatedProfile.hourlyRate,
                 skills: updatedProfile.skills,
                 avatar_url: updatedProfile.avatarUrl,
+                github_url: updatedProfile.githubUrl,
+                linkedin_url: updatedProfile.linkedinUrl,
+                portfolio_email: updatedProfile.portfolioEmail,
                 wallet_address: userWallet?.walletAddress || null
             }
         });

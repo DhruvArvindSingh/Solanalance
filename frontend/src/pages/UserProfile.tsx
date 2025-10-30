@@ -21,6 +21,8 @@ import {
     Link as LinkIcon,
     Mail,
     Calendar,
+    Github,
+    Linkedin,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -35,6 +37,9 @@ interface Profile {
     hourly_rate: number | null;
     company_name: string | null;
     wallet_address: string | null;
+    github_url: string | null;
+    linkedin_url: string | null;
+    portfolio_email: string | null;
     created_at: string;
 }
 
@@ -96,6 +101,11 @@ export default function UserProfile() {
 
             if (profileData) {
                 console.log('Profile data received:', profileData);
+                console.log('Social media fields:', {
+                    github_url: profileData.github_url,
+                    linkedin_url: profileData.linkedin_url,
+                    portfolio_email: profileData.portfolio_email
+                });
                 setProfile({
                     id: profileData.id,
                     user_id: profileData.user_id,
@@ -107,11 +117,17 @@ export default function UserProfile() {
                     hourly_rate: profileData.hourly_rate,
                     company_name: profileData.company_name,
                     wallet_address: profileData.wallet_address,
+                    github_url: profileData.github_url || null,
+                    linkedin_url: profileData.linkedin_url || null,
+                    portfolio_email: profileData.portfolio_email || null,
                     created_at: profileData.created_at
                 });
                 console.log('Profile state set:', {
                     user_id: profileData.user_id,
-                    wallet_address: profileData.wallet_address
+                    wallet_address: profileData.wallet_address,
+                    github_url: profileData.github_url,
+                    linkedin_url: profileData.linkedin_url,
+                    portfolio_email: profileData.portfolio_email
                 });
 
                 setUserRole(profileData.role);
@@ -232,6 +248,79 @@ export default function UserProfile() {
                                     <p className="text-muted-foreground leading-relaxed mb-4">
                                         {profile.bio}
                                     </p>
+                                )}
+
+                                {/* Social Media Links */}
+                                {(profile.github_url || profile.linkedin_url || profile.portfolio_email) ? (
+                                    <div className="mb-6">
+                                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                            <LinkIcon className="w-5 h-5 text-primary" />
+                                            Connect & Follow
+                                        </h3>
+                                        <div className="flex flex-wrap gap-3">
+                                            {profile.github_url && (
+                                                <a
+                                                    href={profile.github_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="group flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 border border-gray-700"
+                                                >
+                                                    <Github className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300" />
+                                                    <div className="flex flex-col">
+                                                        <span className="font-medium">GitHub</span>
+                                                        <span className="text-xs text-gray-300">View repositories</span>
+                                                    </div>
+                                                </a>
+                                            )}
+                                            {profile.linkedin_url && (
+                                                <a
+                                                    href={profile.linkedin_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="group flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+                                                >
+                                                    <Linkedin className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300" />
+                                                    <div className="flex flex-col">
+                                                        <span className="font-medium">LinkedIn</span>
+                                                        <span className="text-xs text-blue-100">Professional profile</span>
+                                                    </div>
+                                                </a>
+                                            )}
+                                            {profile.portfolio_email && (
+                                                <a
+                                                    href={`mailto:${profile.portfolio_email}`}
+                                                    className="group flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+                                                >
+                                                    <Mail className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300" />
+                                                    <div className="flex flex-col">
+                                                        <span className="font-medium">Email</span>
+                                                        <span className="text-xs text-emerald-100">Get in touch</span>
+                                                    </div>
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : isOwnProfile && (
+                                    <div className="mb-6 p-4 border-2 border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
+                                        <div className="text-center">
+                                            <LinkIcon className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                                            <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                                                Add Social Media Links
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground mb-3">
+                                                Help others connect with you by adding your GitHub, LinkedIn, or contact email
+                                            </p>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => navigate("/profile/edit")}
+                                                className="text-xs"
+                                            >
+                                                <Edit className="w-3 h-3 mr-1" />
+                                                Add Links
+                                            </Button>
+                                        </div>
+                                    </div>
                                 )}
 
                                 <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">

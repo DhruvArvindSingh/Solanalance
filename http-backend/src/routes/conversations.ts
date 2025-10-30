@@ -29,26 +29,29 @@ router.get('/', authenticateToken, async (req, res) => {
                 ...searchConditions
             },
             include: {
-                job: { 
-                    select: { 
-                        title: true 
-                    } 
+                job: {
+                    select: {
+                        title: true
+                    }
                 },
-                recruiter: { 
-                    select: { 
-                        id: true, 
-                        fullName: true, 
-                        avatarUrl: true 
-                    } 
+                recruiter: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        avatarUrl: true
+                    }
                 },
-                freelancer: { 
-                    select: { 
-                        id: true, 
-                        fullName: true, 
-                        avatarUrl: true 
-                    } 
+                freelancer: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        avatarUrl: true
+                    }
                 },
                 messages: {
+                    where: {
+                        deletedAt: null // Exclude deleted messages
+                    },
                     orderBy: { createdAt: 'desc' },
                     take: 1,
                     select: {
@@ -63,7 +66,8 @@ router.get('/', authenticateToken, async (req, res) => {
                         messages: {
                             where: {
                                 isRead: false,
-                                senderId: { not: userId }
+                                senderId: { not: userId },
+                                deletedAt: null
                             }
                         }
                     }
@@ -113,12 +117,12 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
-// Get messages for a specific conversation/project
+// Get messages for a specific conversation/project with pagination
 router.get('/:projectId/messages', authenticateToken, async (req, res) => {
     try {
         const userId = req.user!.id;
         const { projectId } = req.params;
-        const { page = '1', limit = '50' } = req.query;
+        const { page = '1', limit = '50', before } = req.query;
 
         // Verify user has access to this project
         const project = await req.prisma.project.findFirst({
@@ -139,8 +143,37 @@ router.get('/:projectId/messages', authenticateToken, async (req, res) => {
         const limitNum = parseInt(limit as string);
         const skip = (pageNum - 1) * limitNum;
 
+        // Build where clause for cursor-based pagination if 'before' is provided
+        const whereClause: any = {
+            projectId,
+            deletedAt: null // Exclude soft-deleted messages
+        };
+
+        if (before) {
+            // Get messages before a certain message ID (for infinite scroll)
+            const beforeMessage = await req.prisma.message.findUnique({
+                where: { id: before as string },
+                select: { createdAt: true }
+            });
+
+            if (beforeMessage) {
+                whereClause.createdAt = {
+                    lt: beforeMessage.createdAt
+                };
+            }
+        }
+
+        // Get total count for pagination info
+        const totalCount = await req.prisma.message.count({
+            where: {
+                projectId,
+                deletedAt: null
+            }
+        });
+
+        // Fetch messages
         const messages = await req.prisma.message.findMany({
-            where: { projectId },
+            where: whereClause,
             include: {
                 sender: {
                     select: {
@@ -150,9 +183,9 @@ router.get('/:projectId/messages', authenticateToken, async (req, res) => {
                 }
             },
             orderBy: {
-                createdAt: 'asc'
+                createdAt: 'asc' // Chronological order
             },
-            skip,
+            skip: before ? 0 : skip, // Don't skip if using cursor
             take: limitNum
         });
 
@@ -162,15 +195,28 @@ router.get('/:projectId/messages', authenticateToken, async (req, res) => {
             sender_id: message.senderId,
             content: message.content,
             created_at: message.createdAt.toISOString(),
+            updated_at: message.updatedAt?.toISOString(),
             sender: {
                 full_name: message.sender.fullName,
                 avatar_url: message.sender.avatarUrl
             },
             messageType: message.messageType,
+            fileUrl: message.fileUrl,
+            fileName: message.fileName,
+            fileSize: message.fileSize,
             isRead: message.isRead
         }));
 
-        res.json(transformedMessages);
+        res.json({
+            messages: transformedMessages,
+            pagination: {
+                total: totalCount,
+                page: pageNum,
+                limit: limitNum,
+                totalPages: Math.ceil(totalCount / limitNum),
+                hasMore: skip + limitNum < totalCount
+            }
+        });
 
     } catch (error) {
         console.error('Error fetching messages:', error);
@@ -183,7 +229,7 @@ router.post('/:projectId/messages', authenticateToken, async (req, res) => {
     try {
         const userId = req.user!.id;
         const { projectId } = req.params;
-        const { content, messageType = 'text' } = req.body;
+        const { content, messageType = 'text', fileUrl, fileName, fileSize } = req.body;
 
         if (!content || !content.trim()) {
             return res.status(400).json({ error: 'Message content is required' });
@@ -216,6 +262,9 @@ router.post('/:projectId/messages', authenticateToken, async (req, res) => {
                 senderId: userId,
                 content: content.trim(),
                 messageType,
+                fileUrl,
+                fileName,
+                fileSize: fileSize ? parseInt(fileSize) : null,
                 isRead: false
             },
             include: {
@@ -229,12 +278,12 @@ router.post('/:projectId/messages', authenticateToken, async (req, res) => {
         });
 
         // Determine recipient
-        const recipientId = project.recruiterId === userId 
-            ? project.freelancerId 
+        const recipientId = project.recruiterId === userId
+            ? project.freelancerId
             : project.recruiterId;
 
-        const recipientName = project.recruiterId === userId 
-            ? project.freelancer.fullName 
+        const recipientName = project.recruiterId === userId
+            ? project.freelancer.fullName
             : project.recruiter.fullName;
 
         // Create notification for recipient
@@ -255,11 +304,15 @@ router.post('/:projectId/messages', authenticateToken, async (req, res) => {
             sender_id: message.senderId,
             content: message.content,
             created_at: message.createdAt.toISOString(),
+            updated_at: message.updatedAt?.toISOString(),
             sender: {
                 full_name: message.sender.fullName,
                 avatar_url: message.sender.avatarUrl
             },
             messageType: message.messageType,
+            fileUrl: message.fileUrl,
+            fileName: message.fileName,
+            fileSize: message.fileSize,
             isRead: message.isRead
         };
 
@@ -268,6 +321,108 @@ router.post('/:projectId/messages', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error sending message:', error);
         res.status(500).json({ error: 'Failed to send message' });
+    }
+});
+
+// Edit a message
+router.patch('/:projectId/messages/:messageId', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user!.id;
+        const { projectId, messageId } = req.params;
+        const { content } = req.body;
+
+        if (!content || !content.trim()) {
+            return res.status(400).json({ error: 'Message content is required' });
+        }
+
+        // Verify user owns the message
+        const message = await req.prisma.message.findFirst({
+            where: {
+                id: messageId,
+                projectId,
+                senderId: userId,
+                deletedAt: null
+            }
+        });
+
+        if (!message) {
+            return res.status(404).json({ error: 'Message not found or unauthorized' });
+        }
+
+        // Update the message
+        const updatedMessage = await req.prisma.message.update({
+            where: { id: messageId },
+            data: {
+                content: content.trim(),
+                updatedAt: new Date()
+            },
+            include: {
+                sender: {
+                    select: {
+                        fullName: true,
+                        avatarUrl: true
+                    }
+                }
+            }
+        });
+
+        res.json({
+            id: updatedMessage.id,
+            sender_id: updatedMessage.senderId,
+            content: updatedMessage.content,
+            created_at: updatedMessage.createdAt.toISOString(),
+            updated_at: updatedMessage.updatedAt.toISOString(),
+            sender: {
+                full_name: updatedMessage.sender.fullName,
+                avatar_url: updatedMessage.sender.avatarUrl
+            },
+            messageType: updatedMessage.messageType,
+            fileUrl: updatedMessage.fileUrl,
+            fileName: updatedMessage.fileName,
+            fileSize: updatedMessage.fileSize,
+            isRead: updatedMessage.isRead
+        });
+
+    } catch (error) {
+        console.error('Error editing message:', error);
+        res.status(500).json({ error: 'Failed to edit message' });
+    }
+});
+
+// Delete a message (soft delete)
+router.delete('/:projectId/messages/:messageId', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user!.id;
+        const { projectId, messageId } = req.params;
+
+        // Verify user owns the message
+        const message = await req.prisma.message.findFirst({
+            where: {
+                id: messageId,
+                projectId,
+                senderId: userId,
+                deletedAt: null
+            }
+        });
+
+        if (!message) {
+            return res.status(404).json({ error: 'Message not found or unauthorized' });
+        }
+
+        // Soft delete - mark as deleted
+        await req.prisma.message.update({
+            where: { id: messageId },
+            data: {
+                deletedAt: new Date(),
+                content: 'This message has been deleted'
+            }
+        });
+
+        res.json({ success: true, messageId });
+
+    } catch (error) {
+        console.error('Error deleting message:', error);
+        res.status(500).json({ error: 'Failed to delete message' });
     }
 });
 
@@ -298,7 +453,8 @@ router.patch('/:projectId/read', authenticateToken, async (req, res) => {
             where: {
                 projectId,
                 senderId: { not: userId },
-                isRead: false
+                isRead: false,
+                deletedAt: null
             },
             data: {
                 isRead: true

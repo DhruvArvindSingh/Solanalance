@@ -1,6 +1,12 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth';
 
+/**
+ * @deprecated This route is deprecated. Use /api/conversations instead.
+ * This file is kept for backward compatibility only.
+ * All new features should be added to conversations.ts
+ */
+
 const router = express.Router();
 
 // Get messages for a project

@@ -15,6 +15,7 @@ import ratingRoutes from './routes/ratings';
 import messageRoutes from './routes/messages';
 import notificationRoutes from './routes/notifications';
 import conversationRoutes from './routes/conversations';
+import directMessageRoutes from './routes/directMessages';
 import escrowRoutes from './routes/escrow';
 import uploadRoutes from './routes/upload';
 
@@ -45,6 +46,7 @@ app.use('/api/ratings', ratingRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/direct-messages', directMessageRoutes);
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/upload', uploadRoutes);
 

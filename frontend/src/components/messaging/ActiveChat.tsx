@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useMessagingStore } from '@/stores/messagingStore';
 import { MessageBubble } from './MessageBubble';
+import { FileUpload } from './FileUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -13,10 +14,15 @@ export const ActiveChat = () => {
     const { user } = useAuth();
     const {
         selectedProjectId,
+        selectedDirectMessageUserId,
+        activeTab,
         conversations,
+        directMessageUsers,
         messages,
+        directMessages,
         typingUsers,
         sendMessage,
+        sendDirectMessage,
         selectConversation
     } = useMessagingStore();
 
@@ -24,9 +30,22 @@ export const ActiveChat = () => {
     const [isSending, setIsSending] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    const activeConversation = conversations.find(c => c.projectId === selectedProjectId);
-    const activeMessages = messages[selectedProjectId!] || [];
-    const activeTypingUsers = typingUsers[selectedProjectId!] || [];
+    // Determine active conversation and messages based on tab
+    const activeConversation = activeTab === 'projects'
+        ? conversations.find(c => c.projectId === selectedProjectId)
+        : null;
+
+    const activeDirectMessageUser = activeTab === 'people'
+        ? directMessageUsers.find(u => u.id === selectedDirectMessageUserId)
+        : null;
+
+    const activeMessages = activeTab === 'projects'
+        ? (messages[selectedProjectId!] || [])
+        : (directMessages[selectedDirectMessageUserId!] || []);
+
+    const activeTypingUsers = activeTab === 'projects'
+        ? (typingUsers[selectedProjectId!] || [])
+        : []; // Direct message typing indicators can be added later
 
     // Scroll to bottom when new messages arrive
     useEffect(() => {
@@ -37,11 +56,18 @@ export const ActiveChat = () => {
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !selectedProjectId) return;
+        if (!newMessage.trim()) return;
+
+        if (activeTab === 'projects' && !selectedProjectId) return;
+        if (activeTab === 'people' && !selectedDirectMessageUserId) return;
 
         setIsSending(true);
         try {
-            await sendMessage(selectedProjectId, newMessage, activeConversation?.otherUser.id);
+            if (activeTab === 'projects') {
+                await sendMessage(selectedProjectId!, newMessage, activeConversation?.otherUser.id);
+            } else {
+                await sendDirectMessage(selectedDirectMessageUserId!, newMessage);
+            }
             setNewMessage('');
         } catch (error) {
             toast.error('Failed to send message');
@@ -50,13 +76,45 @@ export const ActiveChat = () => {
         }
     };
 
-    if (!activeConversation) {
+    const handleFileUploaded = async (fileData: {
+        fileUrl: string;
+        fileName: string;
+        fileSize: number;
+        mimetype: string;
+    }) => {
+        try {
+            if (activeTab === 'projects') {
+                await sendMessage(selectedProjectId!, fileData.fileName, activeConversation?.otherUser.id, {
+                    fileUrl: fileData.fileUrl,
+                    fileName: fileData.fileName,
+                    fileSize: fileData.fileSize
+                });
+            } else {
+                await sendDirectMessage(selectedDirectMessageUserId!, fileData.fileName, {
+                    fileUrl: fileData.fileUrl,
+                    fileName: fileData.fileName,
+                    fileSize: fileData.fileSize
+                });
+            }
+        } catch (error) {
+            toast.error('Failed to send file');
+        }
+    };
+
+    if (!activeConversation && !activeDirectMessageUser) {
         return (
             <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                <p className="text-sm text-muted-foreground">Select a conversation to start chatting</p>
+                <p className="text-sm text-muted-foreground">
+                    Select a {activeTab === 'projects' ? 'conversation' : 'person'} to start chatting
+                </p>
             </div>
         );
     }
+
+    const currentUser = activeConversation?.otherUser || activeDirectMessageUser;
+    const chatTitle = activeTab === 'projects'
+        ? activeConversation?.jobTitle
+        : 'Direct Message';
 
     return (
         <div className="flex flex-col h-full min-h-0 w-full">
@@ -73,21 +131,21 @@ export const ActiveChat = () => {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="relative">
                         <Avatar className="w-10 h-10">
-                            <AvatarImage src={activeConversation.otherUser.avatar || undefined} />
+                            <AvatarImage src={currentUser?.avatar || undefined} />
                             <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-medium">
-                                {activeConversation.otherUser.name?.charAt(0).toUpperCase() || 'U'}
+                                {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
                             </AvatarFallback>
                         </Avatar>
-                        {activeConversation.otherUser.isOnline && (
+                        {currentUser?.isOnline && (
                             <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 border-2 border-background rounded-full"></div>
                         )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="font-semibold text-foreground truncate text-base">
-                            {activeConversation.otherUser.name}
+                            {currentUser?.name}
                         </p>
                         <p className="text-sm text-muted-foreground truncate">
-                            {activeConversation.jobTitle}
+                            {chatTitle}
                         </p>
                     </div>
                 </div>
@@ -103,7 +161,7 @@ export const ActiveChat = () => {
                             </div>
                             <h3 className="font-medium text-foreground mb-2">Start the conversation</h3>
                             <p className="text-sm text-muted-foreground max-w-xs">
-                                Send a message to discuss your project with {activeConversation.otherUser.name}
+                                Send a message to {activeTab === 'projects' ? 'discuss your project with' : 'start chatting with'} {currentUser?.name}
                             </p>
                         </div>
                     ) : (
@@ -129,29 +187,41 @@ export const ActiveChat = () => {
             )}
 
             {/* Message Input */}
-            <div className="p-4 border-t border-border/30 bg-background/80 flex-shrink-0">
-                <form onSubmit={handleSend} className="flex items-center gap-3">
-                    <div className="flex-1 relative">
+            <div className="p-3 border-t border-border/30 bg-background/80 flex-shrink-0">
+                <form onSubmit={handleSend} className="flex items-center gap-2 relative w-full">
+                    <div className="flex-1 relative min-w-0">
                         <Input
                             type="text"
-                            placeholder={`Message ${activeConversation.otherUser.name}...`}
+                            placeholder={`Message ${currentUser?.name}...`}
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
                             className="h-12 pl-4 pr-4 bg-background/90 border-border/50 focus:border-primary/50 focus:ring-primary/20 rounded-2xl text-sm placeholder:text-muted-foreground/70"
                         />
                     </div>
-                    <Button
-                        type="submit"
-                        size="sm"
-                        disabled={isSending || !newMessage.trim()}
-                        className="h-12 w-12 p-0 bg-primary hover:bg-primary/90 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:hover:scale-100"
-                    >
-                        {isSending ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                            <Send className="w-5 h-5" />
-                        )}
-                    </Button>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* File Upload */}
+                        <FileUpload
+                            onFileUploaded={handleFileUploaded}
+                            userId={user?.id || ''}
+                            conversationType={activeTab === 'projects' ? 'project' : 'direct'}
+                            conversationId={activeTab === 'projects' ? selectedProjectId! : selectedDirectMessageUserId!}
+                            disabled={isSending}
+                        />
+
+                        <Button
+                            type="submit"
+                            size="sm"
+                            disabled={isSending || !newMessage.trim()}
+                            className="h-12 w-12 p-0 bg-primary hover:bg-primary/90 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:hover:scale-100 flex-shrink-0"
+                        >
+                            {isSending ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <Send className="w-5 h-5" />
+                            )}
+                        </Button>
+                    </div>
                 </form>
             </div>
         </div>

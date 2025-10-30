@@ -1,6 +1,6 @@
 {
   "name": "socket-server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "dist/index.js",
   "scripts": {
     "start": "tsc && node dist/index.js",
@@ -13,17 +13,17 @@
   "license": "ISC",
   "description": "Socket server for real-time messaging and notifications",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.920.0",
+    "@prisma/client": "^5.22.0",
     "@types/cors": "^2.8.17",
     "@types/dotenv": "^6.1.1",
     "@types/jsonwebtoken": "^9.0.6",
-    "@types/node-fetch": "^2.6.13",
+    "@types/multer": "^2.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.19.2",
-    "firebase": "^12.4.0",
-    "firebase-admin": "^12.1.0",
     "jsonwebtoken": "^9.0.2",
-    "node-fetch": "^3.3.2",
+    "multer": "^2.0.2",
     "socket.io": "^4.7.5",
     "typescript": "^5.9.3",
     "uuid": "^10.0.0"
@@ -32,6 +32,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.0.0",
     "@types/uuid": "^10.0.0",
-    "nodemon": "^3.1.4"
+    "nodemon": "^3.1.4",
+    "prisma": "^5.22.0"
   }
 }
