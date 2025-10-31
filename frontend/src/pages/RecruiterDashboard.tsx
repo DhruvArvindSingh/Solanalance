@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Briefcase, Users, TrendingUp, Coins } from "lucide-react";
+import { Plus, Briefcase, Users, TrendingUp, Coins, XCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { VerifyFundsButton } from "@/components/VerifyFundsButton";
@@ -36,6 +36,7 @@ export default function RecruiterDashboard() {
         openJobs: 0,
         activeJobs: 0,
         completedJobs: 0,
+        cancelledJobs: 0,
         totalSpent: 0,
     });
 
@@ -79,6 +80,7 @@ export default function RecruiterDashboard() {
             const openJobs = jobsWithStats.filter((j) => j.status === "open").length;
             const activeJobs = jobsWithStats.filter((j) => j.status === "active").length;
             const completedJobs = jobsWithStats.filter((j) => j.status === "completed").length;
+            const cancelledJobs = jobsWithStats.filter((j) => j.status === "cancelled").length;
 
             // Calculate total spent (sum of completed job payments)
             const totalSpent = jobsWithStats
@@ -90,6 +92,7 @@ export default function RecruiterDashboard() {
                 openJobs,
                 activeJobs,
                 completedJobs,
+                cancelledJobs,
                 totalSpent,
             });
         } catch (error: any) {
@@ -108,6 +111,8 @@ export default function RecruiterDashboard() {
                 return "bg-primary/10 text-primary border-primary/30";
             case "completed":
                 return "bg-muted text-muted-foreground border-muted";
+            case "cancelled":
+                return "bg-destructive/10 text-destructive border-destructive/30";
             case "draft":
                 return "bg-warning/10 text-warning border-warning/30";
             default:
@@ -205,15 +210,16 @@ export default function RecruiterDashboard() {
                 <Card className="bg-card border-border">
                     <CardContent className="pt-6">
                         <Tabs defaultValue="all" className="w-full">
-                            <TabsList className="grid w-full grid-cols-5 mb-6">
-                                <TabsTrigger value="all">All</TabsTrigger>
-                                <TabsTrigger value="open">Open</TabsTrigger>
-                                <TabsTrigger value="active">Active</TabsTrigger>
-                                <TabsTrigger value="completed">Completed</TabsTrigger>
-                                <TabsTrigger value="draft">Drafts</TabsTrigger>
+                            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6">
+                                <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
+                                <TabsTrigger value="open" className="text-xs sm:text-sm">Open</TabsTrigger>
+                                <TabsTrigger value="active" className="text-xs sm:text-sm">Active</TabsTrigger>
+                                <TabsTrigger value="completed" className="text-xs sm:text-sm">Completed</TabsTrigger>
+                                <TabsTrigger value="cancelled" className="text-xs sm:text-sm">Cancelled</TabsTrigger>
+                                <TabsTrigger value="draft" className="text-xs sm:text-sm">Drafts</TabsTrigger>
                             </TabsList>
 
-                            {["all", "open", "active", "completed", "draft"].map((tab) => {
+                            {["all", "open", "active", "completed", "cancelled", "draft"].map((tab) => {
                                 const filteredJobs =
                                     tab === "all" ? jobs : jobs.filter((j) => j.status === tab);
 
@@ -232,7 +238,11 @@ export default function RecruiterDashboard() {
                                             filteredJobs.map((job) => (
                                                 <div
                                                     key={job.id}
-                                                    className="p-4 rounded-lg bg-card border border-border hover:border-border transition-colors cursor-pointer"
+                                                    className={`p-4 rounded-lg bg-card transition-colors cursor-pointer ${
+                                                        job.status === 'cancelled'
+                                                            ? 'border border-destructive/30 hover:border-destructive/50'
+                                                            : 'border border-border hover:border-border'
+                                                    }`}
                                                     onClick={() => {
                                                         // For active jobs, navigate to project workspace
                                                         if (job.status === "active" && jobProjectMap[job.id]) {
@@ -290,6 +300,7 @@ export default function RecruiterDashboard() {
                                                                 variant="outline"
                                                                 className={getStatusColor(job.status)}
                                                             >
+                                                                {job.status === 'cancelled' && <XCircle className="w-3 h-3 mr-1" />}
                                                                 {job.status.replace("_", " ")}
                                                             </Badge>
                                                         </div>

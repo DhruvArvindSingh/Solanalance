@@ -148,6 +148,33 @@ export const StakingModal = ({
                         console.log("✓ Escrow verified and recorded");
                         toast.success("Success! Funds verified and locked in escrow.");
                     }
+
+                    // Sync blockchain state to backend after staking
+                    setTimeout(async () => {
+                        try {
+                            console.log("🔄 Syncing blockchain state after staking...");
+                            const syncResponse = await fetch('http://localhost:3000/api/projects/sync-blockchain', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                },
+                                body: JSON.stringify({
+                                    jobId,
+                                    recruiterWallet: publicKey?.toBase58()
+                                })
+                            });
+
+                            if (syncResponse.ok) {
+                                console.log("✅ Blockchain synced successfully after staking");
+                            } else {
+                                const syncError = await syncResponse.json();
+                                console.error("Blockchain sync error:", syncError);
+                            }
+                        } catch (syncErr) {
+                            console.error("Failed to sync blockchain:", syncErr);
+                        }
+                    }, 2000); // Wait 2 seconds for blockchain confirmation
                 } else {
                     console.error("Backend verification failed:", verifyResult.error);
                     toast.warning("Funds locked on-chain, but verification failed. Please use 'Verify Funds' button.");

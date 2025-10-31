@@ -24,14 +24,12 @@ export const JobPaymentStructure = ({
         updateFormData({ totalPayment: total });
     }, [formData.stage1Payment, formData.stage2Payment, formData.stage3Payment]);
 
-    const minimumStake = formData.totalPayment * 0.2;
-
     return (
         <div className="space-y-6">
             <Alert className="border-primary/20 bg-primary/5">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                    Define payment for each of the 3 milestones. You'll be required to stake at least 20% of the total amount when hiring a freelancer.
+                    Define payment for each of the 3 milestones. The full project amount will be locked in escrow when you select a freelancer.
                 </AlertDescription>
             </Alert>
 
@@ -209,18 +207,25 @@ export const JobPaymentStructure = ({
                     </div>
                 </div>
 
-                <div className="pt-3 border-t border-border">
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">
-                            Minimum Stake Required (20%):
-                        </span>
-                        <span className="font-semibold text-warning">
-                            {minimumStake.toFixed(2)} SOL
-                        </span>
+                <div className="pt-3 border-t border-border space-y-3">
+                    <div>
+                        <p className="text-sm text-muted-foreground">
+                            💰 <span className="font-semibold text-primary">Full payment required upon freelancer selection</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                            Once you select a freelancer for this job, the entire {formData.totalPayment.toFixed(2)} SOL will be locked in a secure escrow smart contract. Funds will be automatically released to the freelancer as they complete and you approve each milestone.
+                        </p>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                        You'll need to stake this amount when selecting a freelancer. It will be held in escrow and released as milestones are completed.
-                    </p>
+                    
+                    <div className="p-3 bg-warning/5 border border-warning/20 rounded-lg">
+                        <p className="text-xs text-muted-foreground">
+                            <span className="font-semibold text-warning">⚠️ Cancellation Policy:</span>
+                            <br />
+                            • If <span className="font-medium">no milestones approved</span>: You can cancel the job and reclaim the full staked amount instantly.
+                            <br />
+                            • If <span className="font-medium">milestones have been approved</span>: You'll need to contact support for the reclaim process.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

@@ -884,4 +884,160 @@ router.post('/:id/fix-milestone-payments', authenticateToken, async (req, res) =
     }
 });
 
+// Cancel job - sync with blockchain state after cancellation
+router.post('/:id/cancel', authenticateToken, requireRole('recruiter'), async (req, res) => {
+    try {
+        const { id: jobId } = req.params;
+        const userId = req.user!.id;
+        const { transactionSignature } = req.body;
+
+        console.log('\n' + '='.repeat(80));
+        console.log('❌ JOB CANCELLATION - Backend Sync');
+        console.log('='.repeat(80));
+        console.log('Job ID:', jobId);
+        console.log('Recruiter ID:', userId);
+        console.log('Transaction:', transactionSignature || 'Not provided');
+        console.log('='.repeat(80) + '\n');
+
+        // Find the job and verify ownership
+        const job = await req.prisma.job.findFirst({
+            where: {
+                id: jobId,
+                recruiterId: userId
+            },
+            include: {
+                projects: {
+                    where: {
+                        status: 'active'
+                    },
+                    include: {
+                        milestones: true
+                    }
+                }
+            }
+        });
+
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found or you do not have permission' });
+        }
+
+        if (job.status === 'cancelled') {
+            return res.status(400).json({ 
+                error: 'Job is already cancelled',
+                job: {
+                    id: job.id,
+                    status: job.status
+                }
+            });
+        }
+
+        // Verify escrow is closed on blockchain (optional but recommended)
+        if (job.recruiterWallet) {
+            try {
+                const escrowDetails = await getEscrowDetails(job.recruiterWallet, jobId);
+                
+                // If escrow still exists, cancellation may not have succeeded
+                if (escrowDetails.success) {
+                    console.warn('⚠️  WARNING: Escrow still exists on blockchain!');
+                    console.warn('   This might mean cancellation transaction failed or is still processing');
+                    // Still proceed but log warning
+                } else {
+                    console.log('✓ Verified: Escrow PDA is closed on blockchain');
+                }
+            } catch (error) {
+                console.error('Error verifying escrow closure:', error);
+                // Continue anyway - escrow might be closed or never existed
+            }
+        }
+
+        // Update job status to cancelled
+        const updatedJob = await req.prisma.job.update({
+            where: { id: jobId },
+            data: {
+                status: 'cancelled'
+            }
+        });
+
+        console.log('✓ Job status updated to cancelled');
+
+        // Update any active projects to cancelled
+        const activeProject = job.projects[0];
+        if (activeProject) {
+            await req.prisma.project.update({
+                where: { id: activeProject.id },
+                data: {
+                    status: 'cancelled'
+                }
+            });
+            console.log('✓ Active project status updated to cancelled');
+
+            // Update all pending/in-progress milestones to cancelled
+            const milestonesToCancel = activeProject.milestones.filter(
+                m => m.status === 'pending' || m.status === 'in_progress'
+            );
+
+            if (milestonesToCancel.length > 0) {
+                await req.prisma.milestone.updateMany({
+                    where: {
+                        id: { in: milestonesToCancel.map(m => m.id) }
+                    },
+                    data: {
+                        status: 'cancelled'
+                    }
+                });
+                console.log(`✓ ${milestonesToCancel.length} milestone(s) updated to cancelled`);
+            }
+        }
+
+        // Record the cancellation transaction if signature provided
+        if (transactionSignature && job.recruiterWallet) {
+            try {
+                await req.prisma.transaction.create({
+                    data: {
+                        fromUserId: userId,
+                        toUserId: userId, // Refund to recruiter
+                        projectId: activeProject?.id,
+                        type: 'refund',
+                        amount: parseFloat(job.totalPayment.toString()),
+                        walletFrom: 'ESCROW_PDA',
+                        walletTo: job.recruiterWallet,
+                        walletSignature: transactionSignature,
+                        status: 'confirmed'
+                    }
+                });
+                console.log('✓ Cancellation transaction recorded');
+            } catch (txError) {
+                console.error('Failed to record transaction:', txError);
+                // Don't fail the whole operation if transaction recording fails
+            }
+        }
+
+        console.log('\n' + '='.repeat(80));
+        console.log('✅ JOB CANCELLATION COMPLETE');
+        console.log('='.repeat(80) + '\n');
+
+        res.json({
+            success: true,
+            message: 'Job cancelled successfully',
+            data: {
+                jobId: updatedJob.id,
+                status: updatedJob.status,
+                title: updatedJob.title,
+                refundAmount: parseFloat(job.totalPayment.toString()),
+                cancelledAt: updatedJob.updatedAt,
+                projectCancelled: !!activeProject,
+                transactionRecorded: !!transactionSignature
+            }
+        });
+
+    } catch (error) {
+        console.error('Cancel job error:', error);
+        console.log('='.repeat(80) + '\n');
+        res.status(500).json({ 
+            error: 'Failed to cancel job',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+
 export default router;

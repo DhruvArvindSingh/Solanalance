@@ -389,6 +389,18 @@ export default function ProjectWorkspace() {
             return;
         }
 
+        // Check if previous milestone is approved (sequential approval constraint)
+        if (milestone.stage_number > 1) {
+            const previousMilestone = milestones.find(m => m.stage_number === milestone.stage_number - 1);
+            if (previousMilestone && previousMilestone.status !== 'approved') {
+                toast.error(
+                    `Cannot approve Milestone ${milestone.stage_number}. Please approve Milestone ${milestone.stage_number - 1} first.`,
+                    { duration: 4000 }
+                );
+                return;
+            }
+        }
+
         setIsReviewing(true);
         setReviewingMilestoneId(milestone.id);
 
@@ -423,6 +435,24 @@ export default function ProjectWorkspace() {
                     setReviewComments("");
                     fetchProjectData();
                     fetchEscrowData();
+
+                    // Sync blockchain state to backend after approval
+                    setTimeout(async () => {
+                        try {
+                            console.log("🔄 Syncing blockchain state after milestone approval...");
+                            const { error: syncError } = await apiClient.projects.syncWithBlockchain({
+                                jobId: project.job_id,
+                                recruiterWallet: project.job.recruiter_wallet || ''
+                            });
+                            if (syncError) {
+                                console.error("Blockchain sync error:", syncError);
+                            } else {
+                                console.log("✅ Blockchain synced successfully after approval");
+                            }
+                        } catch (syncErr) {
+                            console.error("Failed to sync blockchain:", syncErr);
+                        }
+                    }, 2000); // Wait 2 seconds for blockchain confirmation
 
                     // If this was the final milestone, show rating modal
                     if (milestone.stage_number === 3) {
@@ -604,6 +634,24 @@ export default function ProjectWorkspace() {
             console.log("Refreshing project data...");
             fetchProjectData();
             fetchEscrowData();
+
+            // Sync blockchain state to backend after claim
+            setTimeout(async () => {
+                try {
+                    console.log("🔄 Syncing blockchain state after milestone claim...");
+                    const { error: syncError } = await apiClient.projects.syncWithBlockchain({
+                        jobId: project.job_id,
+                        recruiterWallet: recruiterWalletAddress
+                    });
+                    if (syncError) {
+                        console.error("Blockchain sync error:", syncError);
+                    } else {
+                        console.log("✅ Blockchain synced successfully after claim");
+                    }
+                } catch (syncErr) {
+                    console.error("Failed to sync blockchain:", syncErr);
+                }
+            }, 2000); // Wait 2 seconds for blockchain confirmation
             console.log("=== CLAIM MILESTONE DEBUG END (SUCCESS) ===");
         } catch (error: any) {
             console.error("=== CLAIM MILESTONE ERROR ===");
@@ -1267,27 +1315,39 @@ export default function ProjectWorkspace() {
                                             </div>
 
                                             <div className="flex space-x-2">
-                                                <Button
-                                                    onClick={() => handleApproveMilestone(milestone)}
-                                                    disabled={
-                                                        isReviewing &&
-                                                        reviewingMilestoneId === milestone.id
-                                                    }
-                                                    className="flex-1 bg-primary"
-                                                >
-                                                    {isReviewing &&
-                                                        reviewingMilestoneId === milestone.id ? (
-                                                        <>
-                                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                            Processing...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <CheckCircle className="w-4 h-4 mr-2" />
-                                                            Approve & Release Payment
-                                                        </>
-                                                    )}
-                                                </Button>
+                                                {(() => {
+                                                    // Check if previous milestone needs to be approved first
+                                                    const previousMilestone = milestone.stage_number > 1 
+                                                        ? milestones.find(m => m.stage_number === milestone.stage_number - 1)
+                                                        : null;
+                                                    const canApprove = !previousMilestone || previousMilestone.status === 'approved';
+                                                    
+                                                    return (
+                                                        <Button
+                                                            onClick={() => handleApproveMilestone(milestone)}
+                                                            disabled={
+                                                                !canApprove ||
+                                                                (isReviewing && reviewingMilestoneId === milestone.id)
+                                                            }
+                                                            className="flex-1 bg-primary"
+                                                            title={!canApprove ? `Please approve Milestone ${milestone.stage_number - 1} first` : ''}
+                                                        >
+                                                            {isReviewing &&
+                                                                reviewingMilestoneId === milestone.id ? (
+                                                                <>
+                                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                                    Processing...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                                                    {!canApprove ? `Approve Milestone ${milestone.stage_number - 1} First` : 'Approve & Release Payment'}
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                    );
+                                                })()}
+                                                
                                                 <Button
                                                     onClick={() => handleRequestRevision(milestone.id)}
                                                     disabled={

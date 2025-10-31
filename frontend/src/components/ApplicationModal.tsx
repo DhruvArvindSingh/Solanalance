@@ -353,11 +353,10 @@ export const ApplicationModal = ({
                                 <span className="ml-2 text-sm text-muted-foreground">Loading wallets...</span>
                             </div>
                         ) : (
-                            <Tabs value={walletSelectionMethod} onValueChange={(value) => setWalletSelectionMethod(value as "profile" | "connect" | "manual")} className="w-full">
-                                <TabsList className="grid w-full grid-cols-3">
+                            <Tabs value={walletSelectionMethod} onValueChange={(value) => setWalletSelectionMethod(value as "profile" | "connect")} className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="profile" className="text-xs">Profile Wallets</TabsTrigger>
                                     <TabsTrigger value="connect" className="text-xs">Connect Wallet</TabsTrigger>
-                                    <TabsTrigger value="manual" className="text-xs">Manual Entry</TabsTrigger>
                                 </TabsList>
 
                                 <TabsContent value="profile" className="space-y-3">
@@ -405,7 +404,7 @@ export const ApplicationModal = ({
                                         <Alert className="border-amber-500/30 bg-amber-500/10">
                                             <AlertCircle className="h-4 w-4 text-amber-600" />
                                             <AlertDescription>
-                                                No wallet addresses found in your profile. Use "Connect Wallet" or "Manual Entry" instead.
+                                                No wallet addresses found in your profile. Use "Connect Wallet" instead.
                                             </AlertDescription>
                                         </Alert>
                                     )}
@@ -465,7 +464,8 @@ export const ApplicationModal = ({
                                     </div>
                                 </TabsContent>
 
-                                <TabsContent value="manual" className="space-y-3">
+                                {/* Manual Entry tab removed - only Profile Wallets and Connect Wallet allowed */}
+                                <TabsContent value="manual" className="space-y-3" style={{display: 'none'}}>
                                     <div className="space-y-3">
                                         <div className="relative">
                                             <Input

@@ -23,6 +23,8 @@ import {
     Calendar,
     Github,
     Linkedin,
+    Copy,
+    Check,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -79,8 +81,19 @@ export default function UserProfile() {
     const [ratings, setRatings] = useState<Rating[]>([]);
     const [userRole, setUserRole] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [copiedWallet, setCopiedWallet] = useState(false);
 
     const isOwnProfile = user?.id === id;
+
+    const copyWalletAddress = async (address: string) => {
+        try {
+            await navigator.clipboard.writeText(address);
+            setCopiedWallet(true);
+            setTimeout(() => setCopiedWallet(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy wallet address:', err);
+        }
+    };
 
     useEffect(() => {
         if (id) {
@@ -206,19 +219,39 @@ export default function UserProfile() {
                                                 {userRole}
                                             </Badge>
                                         )}
-                                        <div className="flex items-center gap-2 mb-3">
+                                        <div className="flex items-center gap-2 mb-2">
                                             <span className="text-sm text-muted-foreground">User ID:</span>
                                             <Badge variant="secondary" className="font-mono">
                                                 #{profile.user_id}
                                             </Badge>
                                         </div>
-                                        {console.log('Rendering profile:', { user_id: profile.user_id, wallet_address: profile.wallet_address })}
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="text-sm text-muted-foreground">Profile ID:</span>
+                                            <Badge variant="outline" className="font-mono text-xs">
+                                                {profile.id}
+                                            </Badge>
+                                        </div>
                                         {profile.wallet_address && (
                                             <div className="flex items-center gap-2 mb-3">
                                                 <span className="text-sm text-muted-foreground">Wallet:</span>
                                                 <Badge variant="outline" className="font-mono text-xs">
                                                     {profile.wallet_address.slice(0, 8)}...{profile.wallet_address.slice(-8)}
                                                 </Badge>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        copyWalletAddress(profile.wallet_address!);
+                                                    }}
+                                                >
+                                                    {copiedWallet ? (
+                                                        <Check className="h-3 w-3 text-success" />
+                                                    ) : (
+                                                        <Copy className="h-3 w-3" />
+                                                    )}
+                                                </Button>
                                             </div>
                                         )}
                                     </div>

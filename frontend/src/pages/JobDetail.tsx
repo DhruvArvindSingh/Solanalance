@@ -283,6 +283,18 @@ export default function JobDetail() {
             return;
         }
 
+        // Check if previous milestone is approved (sequential approval constraint)
+        if (milestone.stage_number > 1 && job.milestones) {
+            const previousMilestone = job.milestones.find((m: Milestone) => m.stage_number === milestone.stage_number - 1);
+            if (previousMilestone && previousMilestone.status !== 'approved') {
+                toast.error(
+                    `Cannot approve Milestone ${milestone.stage_number}. Please approve Milestone ${milestone.stage_number - 1} first.`,
+                    { duration: 4000 }
+                );
+                return;
+            }
+        }
+
         setIsApproving(true);
 
         try {
@@ -568,7 +580,7 @@ export default function JobDetail() {
             }
 
             toast.success("Successfully synced with blockchain!");
-            
+
             // Refresh job details to show updated data
             await fetchJobDetails();
         } catch (error: any) {
@@ -596,13 +608,13 @@ export default function JobDetail() {
             // First, check if any milestones have been approved
             if (job.recruiter_wallet) {
                 toast.info("Checking milestone status...");
-                
+
                 const { getMilestoneStatus } = await import("@/lib/escrow-operations");
                 const milestoneStatuses = await getMilestoneStatus(job.recruiter_wallet, job.id);
-                
+
                 if (milestoneStatuses) {
                     const hasApprovedMilestone = milestoneStatuses.some(m => m.approved);
-                    
+
                     if (hasApprovedMilestone) {
                         // Milestone(s) approved - send email inquiry instead
                         const confirmed = window.confirm(
@@ -672,20 +684,35 @@ export default function JobDetail() {
 
             toast.success("Job canceled successfully! Funds have been refunded to your wallet.");
 
-            // Update backend to mark job as cancelled
+            // Sync backend with blockchain cancellation
             try {
-                const { error } = await apiClient.jobs.update(job.id, { status: 'cancelled' });
-                if (error) {
-                    console.error("Failed to update job status in database:", error);
-                    toast.warning("Job cancelled on blockchain but database update failed. Please refresh.");
+                const cancelResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/jobs/${job.id}/cancel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        transactionSignature: result.txSignature
+                    })
+                });
+
+                if (!cancelResponse.ok) {
+                    const errorData = await cancelResponse.json();
+                    console.error("Failed to sync cancellation with database:", errorData);
+                    toast.warning("Job cancelled on blockchain but database sync failed. Please refresh the page.");
+                } else {
+                    const cancelData = await cancelResponse.json();
+                    console.log("✓ Database synced:", cancelData);
                 }
             } catch (dbError) {
-                console.error("Database update error:", dbError);
+                console.error("Database sync error:", dbError);
+                toast.warning("Job cancelled on blockchain. Database will sync automatically.");
             }
 
             // Redirect to dashboard after a short delay
             setTimeout(() => {
-                navigate('/dashboard');
+                navigate('/dashboard/recruiter');
             }, 2000);
         } catch (error: any) {
             console.error("Error canceling job:", error);
@@ -744,15 +771,15 @@ export default function JobDetail() {
                     Back
                 </Button>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Job Header */}
                         <Card className="bg-card border-border">
                             <CardHeader>
-                                <div className="flex items-start justify-between mb-4">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
                                     <div className="flex-1">
-                                        <h1 className="text-3xl font-bold mb-3">{job.title}</h1>
+                                        <h1 className="text-2xl sm:text-3xl font-bold mb-3">{job.title}</h1>
                                         <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                                             <div className="flex items-center space-x-1">
                                                 <Calendar className="w-4 h-4" />
@@ -769,9 +796,9 @@ export default function JobDetail() {
                                         </div>
                                     </div>
 
-                                    <div className="text-right">
-                                        <div className="flex items-center space-x-2 text-3xl font-bold text-primary mb-1">
-                                            <Coins className="w-8 h-8" />
+                                    <div className="text-left sm:text-right">
+                                        <div className="flex items-center space-x-2 text-2xl sm:text-3xl font-bold text-primary mb-1">
+                                            <Coins className="w-6 sm:w-8 h-6 sm:h-8" />
                                             <span>{job.total_payment.toFixed(2)} SOL</span>
                                         </div>
                                         <p className="text-xs text-muted-foreground">Total Payment</p>
@@ -947,12 +974,12 @@ export default function JobDetail() {
                                         <div className="space-y-3 pt-2">
                                             {/* Recruiter-only actions */}
                                             {userRole === 'recruiter' && user?.id === job.recruiter_id && (
-                                                <div className="flex gap-3">
+                                                <div className="flex flex-col sm:flex-row gap-3">
                                                     <Button
                                                         onClick={handleVerifyFunds}
                                                         disabled={isVerifying || isSyncing}
                                                         variant="outline"
-                                                        className="flex-1"
+                                                        className="flex-1 text-sm sm:text-base"
                                                     >
                                                         {isVerifying ? (
                                                             <>
@@ -970,7 +997,7 @@ export default function JobDetail() {
                                                         onClick={handleSyncBlockchain}
                                                         disabled={isVerifying || isSyncing}
                                                         variant="outline"
-                                                        className="flex-1"
+                                                        className="flex-1 text-sm sm:text-base"
                                                     >
                                                         {isSyncing ? (
                                                             <>
@@ -986,7 +1013,7 @@ export default function JobDetail() {
                                                     </Button>
                                                 </div>
                                             )}
-                                            
+
                                             {/* Freelancer view - show existing VerifyFundsButton */}
                                             {userRole === 'freelancer' && (
                                                 <div className="flex justify-center">
@@ -1159,23 +1186,34 @@ export default function JobDetail() {
                                                                         </>
                                                                     )}
                                                                 </Button>
-                                                                <Button
-                                                                    onClick={() => handleApproveMilestone(milestone)}
-                                                                    disabled={isApproving || isRequestingChanges}
-                                                                    className="flex-1 bg-primary"
-                                                                >
-                                                                    {isApproving ? (
-                                                                        <>
-                                                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                                            Approving...
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <CheckCircle className="w-4 h-4 mr-2" />
-                                                                            Approve & Disburse
-                                                                        </>
-                                                                    )}
-                                                                </Button>
+                                                                {(() => {
+                                                                    // Check if previous milestone needs to be approved first
+                                                                    const previousMilestone = milestone.stage_number > 1 && job.milestones
+                                                                        ? job.milestones.find((m: Milestone) => m.stage_number === milestone.stage_number - 1)
+                                                                        : null;
+                                                                    const canApprove = !previousMilestone || previousMilestone.status === 'approved';
+                                                                    
+                                                                    return (
+                                                                        <Button
+                                                                            onClick={() => handleApproveMilestone(milestone)}
+                                                                            disabled={!canApprove || isApproving || isRequestingChanges}
+                                                                            className="flex-1 bg-primary"
+                                                                            title={!canApprove ? `Please approve Milestone ${milestone.stage_number - 1} first` : ''}
+                                                                        >
+                                                                            {isApproving ? (
+                                                                                <>
+                                                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                                                    Approving...
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                                                                    {!canApprove ? `Approve Milestone ${milestone.stage_number - 1} First` : 'Approve & Disburse'}
+                                                                                </>
+                                                                            )}
+                                                                        </Button>
+                                                                    );
+                                                                })()}
                                                             </div>
                                                         </div>
                                                     ) : (
@@ -1316,7 +1354,7 @@ export default function JobDetail() {
                             <CardHeader>
                                 <CardTitle>About the Recruiter</CardTitle>
                             </CardHeader>
-                            <CardContent 
+                            <CardContent
                                 className="space-y-4 cursor-pointer hover:bg-accent/50 transition-colors rounded-lg"
                                 onClick={() => navigate(`/profile/${job.recruiter_id}`)}
                             >

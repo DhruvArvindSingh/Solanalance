@@ -69,6 +69,46 @@
     scroll-behavior: smooth;
   }
 
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    /* Improve tap targets for touch */
+    button, a, input, select, textarea {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Prevent text size adjustment on orientation change */
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    /* Remove tap highlight on mobile */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+    }
+
+    /* Improve input fields on mobile */
+    input, textarea {
+      font-size: 16px; /* Prevents zoom on iOS */
+    }
+  }
+
+  /* Touch-friendly interactions */
+  @media (hover: none) and (pointer: coarse) {
+    /* Remove hover effects on touch devices */
+    .hover-lift:hover {
+      transform: none;
+    }
+    
+    /* Make buttons more touch-friendly */
+    button:active {
+      transform: scale(0.95);
+      opacity: 0.8;
+    }
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
